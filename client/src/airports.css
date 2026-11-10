@@ -1,0 +1,20 @@
+.recharts-wrapper, .recharts-wrapper * { outline: none; }
+.statusrow { margin: -8px 0 16px; }
+.split { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+.rank { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.rank button { all: unset; cursor: pointer; display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; font-size: .875rem; }
+.rank button:hover { background: var(--panel2); }
+.rank button:focus-visible { outline: 2px solid var(--sky); }
+.rank button.on { background: var(--panel2); box-shadow: inset 0 0 0 1px var(--sky); }
+.rank b { font-weight: 600; }
+.rank .bar { height: 6px; border-radius: 3px; background: #1a3750; overflow: hidden; }
+.rank .bar i { display: block; height: 100%; background: var(--sky); border-radius: 3px; }
+.rank .v { color: var(--muted); font-variant-numeric: tabular-nums; }
+.heat { display: grid; grid-template-columns: 36px repeat(24, 1fr); gap: 3px; margin-top: 16px; font-size: .75rem; color: var(--muted); min-width: 560px; }
+.heat .cell { aspect-ratio: 1.3; border-radius: 4px; background: #14293c; }
+.heat .hh { text-align: center; }
+.scroll { overflow-x: auto; }
+.picked { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.picked h2 { margin: 0; }
+.busy { color: var(--sky); font-size: .875rem; margin: 8px 0 0; }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; } }

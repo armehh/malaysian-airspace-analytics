@@ -5,6 +5,7 @@ import { useApi, type Density } from '../lib/api';
 import '../airports.css';
 import '../heatmap.css';
 
+const G = { ...L } as Record<string, unknown>; // salinan boleh ubah untuk leaflet.heat
 type HeatFactory = (pts: [number, number, number][], opts: object) => L.Layer;
 const RANGES = [{ d: 1, label: '24 jam' }, { d: 7, label: '7 hari' }, { d: 30, label: '30 hari' }];
 
@@ -33,13 +34,13 @@ export default function Heatmap() {
     let live = true;
     (async () => {
       // leaflet.heat mencari L global, jadi ia dimuat selepas L ditetapkan.
-      (window as unknown as { L: typeof L }).L = L;
+      (window as unknown as { L: unknown }).L = G;
       await import('leaflet.heat');
       if (!live || !map.current) return;
       layer.current?.remove();
       const max = data.data[0]?.count ?? 1;
       const pts = data.data.map((d): [number, number, number] => [d.lat, d.lng, Math.sqrt(d.count / max)]);
-      const heat = (L as unknown as { heatLayer: HeatFactory }).heatLayer;
+      const heat = (G as unknown as { heatLayer: HeatFactory }).heatLayer;
       layer.current = heat(pts, {
         radius: 18, blur: 16, maxZoom: 9, minOpacity: 0.25,
         gradient: { 0.2: '#1b4965', 0.45: '#5fa8d3', 0.7: '#f2b441', 1: '#ff6b6b' },

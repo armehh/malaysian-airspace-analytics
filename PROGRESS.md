@@ -15,8 +15,8 @@ Collector, API dan dashboard asas sudah **hidup di internet**. Data sedang dikum
 | 2 | REST API, ujian | Siap, hidup |
 | 3 | Dashboard: Ringkasan | Siap, hidup |
 | 3 | Dashboard: Lapangan terbang | Siap, hidup |
-| 3 | Dashboard: Syarikat | **Belum** |
-| 4 | Peta heatmap (`/density`) | Belum |
+| 3 | Dashboard: Syarikat | Siap, hidup |
+| 4 | Peta kepadatan (`/density`) | Siap, hidup |
 | 4 | Jadual `hourly_stats` + spot-check | Belum |
 | 4 | Retensi 30 hari (`/api/maintenance`) | Belum |
 | 5 | Eksport CSV/PDF | Belum |
@@ -97,3 +97,4 @@ SELECT ok, count(*) FROM collector_runs GROUP BY ok;
 ## Log perubahan
 
 - **10 Nov 2026**: collector diuji (84 pesawat, adsb.lol), skema dimigrasi ke Neon, API di-deploy ke Render, cron-job.org dikonfigurasi, repo dimasukkan ke GitHub. Dashboard Ringkasan dan Lapangan terbang dibina dan di-deploy sebagai Static Site. Folder `src` berganda di akar repo dibuang.
+- **11 Nov 2026**: halaman Syarikat dan peta kepadatan (petak grid 0.1 darjah, Leaflet, tile OpenStreetMap) siap dan di-deploy. leaflet.heat gagal dimuat sebagai modul ES, jadi digantikan dengan petak segi empat Leaflet.

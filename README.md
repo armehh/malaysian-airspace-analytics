@@ -24,6 +24,8 @@ Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada perminta
 - **Collector**: mengambil snapshot pesawat dari tiga wilayah (Semenanjung, Sarawak, Sabah) dengan fallback antara beberapa feed
 - **Ringkasan**: bilangan pesawat sekarang, syarikat penerbangan, pesawat tertinggi dan terlaju, trend 24 jam, status collector
 - **Lapangan terbang**: ranking, carta setiap jam, dan grid corak mingguan (hari × jam) bagi setiap lapangan terbang
+- **Syarikat**: ranking dan carta campuran syarikat mengikut masa
+- **Peta**: kepadatan kedudukan pesawat (24 jam, 7 hari, 30 hari)
 
 Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan datang.
 
@@ -97,6 +99,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | GET | `/api/stats/airports/:code/weekly` | Grid hari × jam |
 | GET | `/api/stats/airlines` | Ranking syarikat penerbangan |
 | GET | `/api/stats/airlines/timeseries?bucket=day` | Siri masa syarikat |
+| GET | `/api/stats/density?from=&to=&grid=0.1` | Kiraan kedudukan pesawat mengikut grid darjah (untuk peta) |
 | GET | `/api/stats/collector` | Kadar kejayaan collector |
 
 `from` dan `to` ialah tarikh ISO. Lalai ialah 7 hari terakhir, maksimum 90 hari.

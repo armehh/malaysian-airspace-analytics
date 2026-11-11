@@ -5,9 +5,9 @@ import { useApi, type Density } from '../lib/api';
 import '../airports.css';
 import '../heatmap.css';
 
-const G = { ...L } as Record<string, unknown>; // salinan boleh ubah untuk leaflet.heat
-type HeatFactory = (pts: [number, number, number][], opts: object) => L.Layer;
 const RANGES = [{ d: 1, label: '24 jam' }, { d: 7, label: '7 hari' }, { d: 30, label: '30 hari' }];
+const STEPS = ['#1b4965', '#5fa8d3', '#f2b441', '#ff6b6b'];
+const colorFor = (t: number) => STEPS[Math.min(3, Math.floor(t * 4))];
 
 export default function Heatmap() {
   const [days, setDays] = useState(1);
@@ -30,23 +30,22 @@ export default function Heatmap() {
   }, []);
 
   useEffect(() => {
-    if (!data) return;
-    let live = true;
-    (async () => {
-      // leaflet.heat mencari L global, jadi ia dimuat selepas L ditetapkan.
-      (window as unknown as { L: unknown }).L = G;
-      await import('leaflet.heat');
-      if (!live || !map.current) return;
-      layer.current?.remove();
-      const max = data.data[0]?.count ?? 1;
-      const pts = data.data.map((d): [number, number, number] => [d.lat, d.lng, Math.sqrt(d.count / max)]);
-      const heat = (G as unknown as { heatLayer: HeatFactory }).heatLayer;
-      layer.current = heat(pts, {
-        radius: 18, blur: 16, maxZoom: 9, minOpacity: 0.25,
-        gradient: { 0.2: '#1b4965', 0.45: '#5fa8d3', 0.7: '#f2b441', 1: '#ff6b6b' },
-      }).addTo(map.current);
-    })();
-    return () => { live = false; };
+    const m = map.current;
+    if (!m || !data) return;
+    layer.current?.remove();
+    const group = L.layerGroup();
+    const renderer = L.canvas({ padding: 0.5 });
+    const half = data.grid / 2;
+    const max = data.data[0]?.count ?? 1;
+    for (const d of data.data) {
+      const t = Math.sqrt(d.count / max); // skala punca kuasa dua
+      L.rectangle([[d.lat - half, d.lng - half], [d.lat + half, d.lng + half]], {
+        renderer, stroke: false, interactive: false,
+        fillColor: colorFor(t), fillOpacity: 0.3 + 0.6 * t,
+      }).addTo(group);
+    }
+    group.addTo(m);
+    layer.current = group;
   }, [data]);
 
   return (
@@ -66,7 +65,7 @@ export default function Heatmap() {
       {data && data.snapshots > 0 && data.snapshots < 288 && days > 1 && (
         <p className="note">Data baru {data.snapshots} snapshot, jadi tempoh {days} hari belum penuh.</p>
       )}
-      <p className="caption">Setiap sel grid kira-kira 11 km. Warna menunjukkan bilangan kedudukan yang diperhatikan feed ADS-B awam (skala punca kuasa dua), bukan laluan penerbangan. Liputan bergantung pada penerima sukarelawan.</p>
+      <p className="caption">Setiap petak ialah sel grid kira-kira 11 km. Warna biru ke merah menunjukkan bilangan kedudukan yang diperhatikan feed ADS-B awam (skala punca kuasa dua), bukan laluan penerbangan. Liputan bergantung pada penerima sukarelawan.</p>
     </section>
   );
 }

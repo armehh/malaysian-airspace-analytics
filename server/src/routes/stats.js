@@ -128,6 +128,24 @@ export function statsRouter(pool) {
       data: rows.map((x) => ({ bucketMyt: x.bucket_myt, airline: x.airline, avgAircraft: x.avg_aircraft })) });
   }));
 
+  // Kepadatan kedudukan pesawat, dikumpul ke grid darjah (lalai 0.1, had 0.02 hingga 1).
+  r.get('/density', wrap(async (req, res) => {
+    const q = parse(rangeSchema, req.query);
+    const grid = Math.min(1, Math.max(0.02, Number(req.query.grid) || 0.1));
+    const [cells, snaps] = await Promise.all([
+      pool.query(`
+        SELECT round((floor(lat::float8 / $3::float8) * $3::float8 + $3::float8 / 2)::numeric, 4)::float8 AS glat,
+               round((floor(lng::float8 / $3::float8) * $3::float8 + $3::float8 / 2)::numeric, 4)::float8 AS glng,
+               count(*)::int AS c
+        FROM observations
+        WHERE taken_at >= $1 AND taken_at < $2 AND lat IS NOT NULL AND lng IS NOT NULL
+          AND ($4::text IS NULL OR nearest_apt = $4)
+        GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 5000`, [q.from, q.to, grid, q.airport ?? null]),
+      pool.query('SELECT count(*)::int AS n FROM snapshots WHERE taken_at >= $1 AND taken_at < $2', [q.from, q.to]),
+    ]);
+    res.json({ from: q.from, to: q.to, grid, snapshots: snaps.rows[0].n,
+      data: cells.rows.map((x) => ({ lat: x.glat, lng: x.glng, count: x.c })) });
+  }));
   // Kesihatan collector: kadar kejayaan & jurang.
   r.get('/collector', wrap(async (req, res) => {
     const q = parse(rangeSchema, req.query);

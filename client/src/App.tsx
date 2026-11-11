@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import Overview from './pages/Overview';
 import Airports from './pages/Airports';
 import Airlines from './pages/Airlines';
+const Heatmap = lazy(() => import('./pages/Heatmap'));
 
 const page = () => location.hash.replace(/^#\/?/, '');
 
@@ -25,9 +26,12 @@ export default function App() {
           {link('', 'Ringkasan')}
           {link('airports', 'Lapangan terbang')}
           {link('airlines', 'Syarikat')}
+          {link('map', 'Peta')}
         </nav>
       </header>
-      {p === 'airports' ? <Airports /> : p === 'airlines' ? <Airlines /> : <Overview />}
+      <Suspense fallback={<p className="msg">Memuatkan peta...</p>}>
+        {p === 'airports' ? <Airports /> : p === 'airlines' ? <Airlines /> : p === 'map' ? <Heatmap /> : <Overview />}
+      </Suspense>
     </div>
   );
 }

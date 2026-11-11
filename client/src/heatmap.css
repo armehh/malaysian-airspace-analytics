@@ -1,0 +1,5 @@
+.map { height: min(70vh, 560px); margin-top: 12px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
+.leaflet-container { background: #0b1b2a; font: inherit; }
+.leaflet-control-attribution { background: rgba(11, 27, 42, .8) !important; color: var(--muted) !important; }
+.leaflet-control-attribution a { color: var(--sky) !important; }
+.dark-tiles { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.5); }

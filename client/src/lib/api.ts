@@ -40,3 +40,5 @@ export function useApi<T>(path: string | null, refreshMs = 0) {
   }, [path, refreshMs]);
   return state;
 }
+
+export type Density = { grid: number; snapshots: number; data: { lat: number; lng: number; count: number }[] };

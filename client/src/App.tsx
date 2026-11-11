@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Overview from './pages/Overview';
 import Airports from './pages/Airports';
+import Airlines from './pages/Airlines';
 
 const page = () => location.hash.replace(/^#\/?/, '');
 
@@ -23,10 +24,10 @@ export default function App() {
         <nav>
           {link('', 'Ringkasan')}
           {link('airports', 'Lapangan terbang')}
-          <a className="off" title="Akan datang">Syarikat</a>
+          {link('airlines', 'Syarikat')}
         </nav>
       </header>
-      {p === 'airports' ? <Airports /> : <Overview />}
+      {p === 'airports' ? <Airports /> : p === 'airlines' ? <Airlines /> : <Overview />}
     </div>
   );
 }

@@ -14,6 +14,8 @@ export type AirportList = { airports: { code: string; name: string }[] };
 export type Compare = { data: { airport: string; avgAircraft: number; uniqueAircraft: number }[] };
 export type Hourly = { data: { hourMyt: string; avgAircraft: number; peakAircraft: number; snapshots: number }[] };
 export type Weekly = { data: { dow: number; hour: number; avgAircraft: number; snapshots: number }[] };
+export type Airlines = { data: { airline: string; observations: number; avgAircraft: number; share: number }[] };
+export type AirlineSeries = { bucket: 'hour' | 'day'; data: { bucketMyt: string; airline: string; avgAircraft: number }[] };
 
 export async function api<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}/api/stats${path}`);

@@ -1,0 +1,11 @@
+.arow { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 10px; row-gap: 5px; align-items: center; padding: 8px 10px; font-size: .875rem; }
+.arow .dot { width: 10px; height: 10px; border-radius: 3px; }
+.arow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arow .v { color: var(--muted); font-variant-numeric: tabular-nums; }
+.arow .bar { grid-column: 2 / 4; height: 6px; border-radius: 3px; background: #1a3750; overflow: hidden; }
+.arow .bar i { display: block; height: 100%; border-radius: 3px; }
+.seg { display: inline-flex; gap: 2px; background: var(--panel2); border: 1px solid var(--line); padding: 3px; border-radius: 999px; }
+.seg button { all: unset; cursor: pointer; padding: 4px 14px; border-radius: 999px; font-size: .8125rem; color: var(--muted); }
+.seg button.on { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--sky); }
+.seg button:focus-visible { outline: 2px solid var(--sky); }
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }

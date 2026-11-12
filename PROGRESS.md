@@ -124,3 +124,7 @@ curl.exe -s -X POST -H "x-collector-secret: $s" http://localhost:3000/api/mainte
 
 - **10 Nov 2026**: collector diuji (84 pesawat, adsb.lol), skema dimigrasi ke Neon, API di-deploy ke Render, cron-job.org dikonfigurasi, repo dimasukkan ke GitHub. Dashboard Ringkasan dan Lapangan terbang dibina dan di-deploy sebagai Static Site. Folder `src` berganda di akar repo dibuang.
 - **11 Nov 2026**: halaman Syarikat dan peta kepadatan (petak grid 0.1 darjah, Leaflet, tile OpenStreetMap) siap dan di-deploy. leaflet.heat gagal dimuat sebagai modul ES, jadi digantikan dengan petak segi empat Leaflet. Kata laluan Neon ditukar dan `CORS_ORIGIN` dihadkan kepada URL dashboard. Migrasi `002_hourly_stats.sql` dan `server/src/maintenance.js` ditambah, endpoint `POST /api/maintenance` dibina dan diuji tempatan, spot-check ringkasan lulus (267 snapshot, padanan tepat).
+
+- **12 Nov 2026**: /api/maintenance disahkan di Render (200, 486 baris diringkaskan, 0 dipadam, cutoff 13 Okt). /hourly kini membaca hourly_stats (hujung julat yang belum diringkaskan masih dibaca daripada observations), commit 32e23e8, dengan ujian baharu untuk /hourly, /density dan /maintenance.
+
+- **12 Nov 2026**: Fasa 4 ditutup. COLLECTOR_SECRET ditukar kerana terdedah dalam output terminal, cron-job harian untuk /api/maintenance dicipta. Fasa 5 bermula dengan ujian dashboard (Vitest) dan job client dalam CI.

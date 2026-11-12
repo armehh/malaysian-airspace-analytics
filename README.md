@@ -13,11 +13,12 @@ Merekod aktiviti pesawat di ruang udara Malaysia setiap 5 minit ke PostgreSQL, k
 
 ```
 cron-job.org ──(POST setiap 5 min)──> Render: API (Node/Express) ──> Neon: PostgreSQL
+cron-job.org ──(POST sekali sehari)──>        |  /api/maintenance
                                               ^
 Render: Dashboard (React, laman statik) ──────┘  (GET /api/stats/*)
 ```
 
-Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada permintaan. Panggilan setiap 5 minit juga menjaga API sentiasa terjaga.
+Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada permintaan. Panggilan setiap 5 minit juga menjaga API sentiasa terjaga. Satu job harian lagi memanggil `/api/maintenance` untuk ringkasan setiap jam dan retensi data.
 
 ## Ciri semasa
 
@@ -26,6 +27,7 @@ Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada perminta
 - **Lapangan terbang**: ranking, carta setiap jam, dan grid corak mingguan (hari × jam) bagi setiap lapangan terbang
 - **Syarikat**: ranking dan carta campuran syarikat mengikut masa
 - **Peta**: kepadatan kedudukan pesawat (24 jam, 7 hari, 30 hari)
+- **Ringkasan setiap jam dan retensi**: jadual `hourly_stats` menyimpan ringkasan kekal, manakala data mentah (`observations`) dipadam selepas 30 hari
 
 Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan datang.
 
@@ -35,14 +37,14 @@ Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan data
 |---|---|
 | Pangkalan data | PostgreSQL (Neon, wilayah Singapore) |
 | API | Node.js 20+, Express 5, Zod, `pg` |
-| Dashboard | React, TypeScript, Vite, Recharts |
+| Dashboard | React, TypeScript, Vite, Recharts, Leaflet |
 | Ujian | Vitest, Supertest |
 | Hos | Render (API dan laman statik), cron-job.org (penjadual) |
 
 ## Struktur
 
 ```
-server/   API, collector, skema SQL, ujian
+server/   API, collector, penyelenggaraan, skema SQL, ujian
 client/   Dashboard React + Vite
 .github/  CI dan penjadual alternatif
 GUIDE.md  Panduan pembinaan langkah demi langkah
@@ -59,6 +61,8 @@ npm run migrate
 npm run dev
 curl -X POST -H "x-collector-secret: <rahsia>" localhost:3000/api/collect
 ```
+
+Migrasi (termasuk `002_hourly_stats.sql`) dijalankan semasa permulaan server.
 
 ### Dashboard
 ```bash
@@ -80,7 +84,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | Pemboleh ubah | Tempat | Fungsi |
 |---|---|---|
 | `DATABASE_URL` | server | Sambungan Postgres. Guna sambungan **langsung** (tanpa `-pooler`) kerana collector guna advisory lock |
-| `COLLECTOR_SECRET` | server | Rahsia untuk header `x-collector-secret` pada `/api/collect` |
+| `COLLECTOR_SECRET` | server | Rahsia untuk header `x-collector-secret` pada `/api/collect` dan `/api/maintenance` |
 | `CORS_ORIGIN` | server | Asal yang dibenarkan membaca API (URL dashboard) |
 | `PORT` | server | Lalai 3000 (Render menetapkannya sendiri) |
 | `CACHE_TTL_MS` | server | Cache respons statistik, lalai 60000 |
@@ -91,6 +95,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | Kaedah | Laluan | Fungsi |
 |---|---|---|
 | POST | `/api/collect` | Ambil snapshot (perlu header `x-collector-secret`) |
+| POST | `/api/maintenance` | Ringkas data ke `hourly_stats` dan padam `observations` lebih 30 hari (perlu header `x-collector-secret`) |
 | GET | `/api/health` | Semak hidup + sambungan DB |
 | GET | `/api/stats/overview` | Ringkasan terkini + trend 24 jam vs paras biasa |
 | GET | `/api/stats/hourly?airport=KUL&from=&to=` | Purata pesawat setiap jam (masa Malaysia) |
@@ -104,6 +109,23 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 
 `from` dan `to` ialah tarikh ISO. Lalai ialah 7 hari terakhir, maksimum 90 hari.
 
+## Ringkasan setiap jam dan retensi
+
+`POST /api/maintenance` dipanggil sekali sehari (cron-job.org, 04:00 Asia/Kuala_Lumpur) dan melakukan tiga perkara mengikut urutan:
+
+1. Meringkaskan 48 jam terakhir ke `hourly_stats` (jam penuh sahaja). Selamat dijalankan berulang kali.
+2. Meringkaskan semua jam yang akan dipadam.
+3. Memadam `observations` yang lebih 30 hari.
+
+`hourly_stats` mempunyai satu baris bagi setiap (jam, lapangan terbang): `snapshots`, `aircraft_sum` dan `peak_aircraft`. Baris dengan `airport = '*'` mewakili semua pesawat. Purata dikira sebagai `aircraft_sum / snapshots`, jadi snapshot tanpa pesawat dikira 0, sama seperti `/hourly`. Jadual `snapshots` tidak dipadam kerana kecil (288 baris sehari).
+
+Ujian manual (tempatan):
+```powershell
+$s = (Get-Content server\.env | Select-String '^COLLECTOR_SECRET=').Line.Split('=',2)[1]
+curl.exe -s -X POST -H "x-collector-secret: $s" http://localhost:3000/api/maintenance
+```
+Jangkaan: `{"ok":true,"summarizedRows":...,"deletedObservations":0,...}`.
+
 ## Keputusan reka bentuk
 
 1. **Purata mengira snapshot tanpa pesawat sebagai 0** (`LEFT JOIN`). Jika tidak, jam yang sunyi akan nampak lebih sibuk daripada sebenar.
@@ -111,12 +133,14 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 3. **Pesawat di darat dibuang**, supaya "ruang udara" bermaksud pesawat di udara.
 4. **Semua masa dikumpul dalam Asia/Kuala_Lumpur di SQL**, bukan di pelayar.
 5. **Penjadual luaran**, kerana pelan percuma Render tidur dan GitHub Actions cron boleh lewat beberapa minit.
+6. **Ringkas dahulu, baru padam.** Data mentah hanya dipadam selepas jamnya diringkaskan ke `hourly_stats`, dan ringkasan disahkan terhadap data mentah dengan query padanan (spot-check).
 
 ## Had yang diketahui
 
 - `nearest_apt` bermaksud pesawat berada dalam lingkungan **60 km** dari lapangan terbang, bukan bukti berlepas atau mendarat.
-- Data ADS-B awam tidak boleh diambil semula. Setiap hari collector tidak berjalan, data hari itu hilang.
+- Data ADS-B awam tidak boleh diambil semula. Setiap hari collector tidak berjalan, data hari itu hilang. Dalam satu tempoh 24 jam yang diukur, 267 daripada 288 snapshot dijangka berjaya dikumpul (kira-kira 92.7%).
 - Corak mingguan hanya bermakna selepas beberapa minggu pengumpulan.
+- Selepas 30 hari, endpoint yang membaca `observations` (termasuk `/hourly` dan `/airports/compare`) tidak lagi mempunyai data bagi tarikh lama. Ringkasan lama kekal dalam `hourly_stats`.
 - Semak terma penggunaan setiap penyedia feed sebelum menggunakan data ini secara komersial.
 
 ## Ujian

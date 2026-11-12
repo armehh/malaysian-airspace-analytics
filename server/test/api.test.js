@@ -136,6 +136,158 @@ describe.skipIf(!url)('API + collector (Postgres sebenar)', () => {
     });
   });
 
+  describe('Fasa 4b: hourly_stats, /density, /maintenance', () => {
+    const HOUR = 3600 * 1000;
+    const hourFloor = (d) => new Date(Math.floor(d.getTime() / HOUR) * HOUR);
+    const auth = { 'x-collector-secret': SECRET };
+    const range = 'from=2026-11-01&to=2026-11-04';
+
+    async function seed(time, obs) {
+      const s = await pool.query('INSERT INTO snapshots(taken_at, source, aircraft_count) VALUES ($1,$2,$3) RETURNING id', [time, 't', obs.length]);
+      for (const [i, o] of obs.entries()) {
+        await pool.query(`INSERT INTO observations(snapshot_id,taken_at,icao24,callsign,airline,lat,lng,alt_m,vel_ms,nearest_apt)
+                          VALUES ($1,$2,$3,'X1','AirAsia',$4,$5,3000,120,$6)`, [s.rows[0].id, time, `ic${i}`, o.lat, o.lng, o.apt]);
+      }
+    }
+    const KUL = { apt: 'KUL', lat: 2.73, lng: 101.74 };
+    const PEN = { apt: 'PEN', lat: 5.38, lng: 100.31 };
+    // Jam 1 (MYT 10:00): 3 snapshot. Jam 2 (MYT 11:00): 2 snapshot, yang kedua kosong, dan tiada PEN langsung.
+    async function seedFixture() {
+      await seed('2026-11-02T02:00:00Z', [KUL, PEN]);
+      await seed('2026-11-02T02:05:00Z', [KUL, PEN]);
+      await seed('2026-11-02T02:10:00Z', [KUL]);
+      await seed('2026-11-02T03:00:00Z', [KUL, KUL]);
+      await seed('2026-11-02T03:05:00Z', []);
+    }
+    const hourly = async (qs = '') => (await request(app).get(`/api/stats/hourly?${qs}${qs ? '&' : ''}${range}`).expect(200)).body.data;
+    const sameHourly = (actual, expected) => {
+      expect(actual.map((d) => [d.hourMyt, d.snapshots, d.peakAircraft])).toEqual(expected.map((d) => [d.hourMyt, d.snapshots, d.peakAircraft]));
+      actual.forEach((d, i) => expect(d.avgAircraft).toBeCloseTo(expected[i].avgAircraft, 9));
+    };
+    const summarizeAll = async () => {
+      const { summarizeRange } = await import('../src/maintenance.js');
+      return summarizeRange(pool, new Date('2026-11-02T00:00:00Z'), new Date('2026-11-03T00:00:00Z'));
+    };
+
+    beforeEach(async () => { await pool.query('TRUNCATE hourly_stats'); });
+    afterAll(async () => { await pool.query('TRUNCATE hourly_stats'); });
+
+    it('hourly daripada data mentah: nilai dijangka', async () => {
+      await seedFixture();
+      const all = await hourly();
+      expect(all).toHaveLength(2);
+      expect(all[0]).toMatchObject({ hourMyt: '2026-11-02T10:00', snapshots: 3, peakAircraft: 2 });
+      expect(all[0].avgAircraft).toBeCloseTo(5 / 3, 9);
+      expect(all[1]).toMatchObject({ hourMyt: '2026-11-02T11:00', snapshots: 2, peakAircraft: 2 });
+      expect(all[1].avgAircraft).toBeCloseTo(1, 9);
+      const pen = await hourly('airport=PEN');
+      expect(pen[1]).toMatchObject({ snapshots: 2, peakAircraft: 0, avgAircraft: 0 }); // jam tanpa PEN kekal sebagai 0
+    });
+
+    it('hourly sama sebelum diringkaskan, selepas diringkaskan, dan selepas data mentah dipadam', async () => {
+      await seedFixture();
+      const before = { all: await hourly(), kul: await hourly('airport=KUL'), pen: await hourly('airport=PEN') };
+      expect(await summarizeAll()).toBeGreaterThan(0);
+      sameHourly(await hourly(), before.all);
+      sameHourly(await hourly('airport=KUL'), before.kul);
+      sameHourly(await hourly('airport=PEN'), before.pen);
+      await pool.query('DELETE FROM observations');
+      await pool.query('DELETE FROM snapshots');
+      sameHourly(await hourly(), before.all);
+      sameHourly(await hourly('airport=KUL'), before.kul);
+      sameHourly(await hourly('airport=PEN'), before.pen);
+    });
+
+    it('hourly: jam yang diringkaskan bercampur dengan jam yang belum diringkaskan', async () => {
+      await seedFixture();
+      const before = await hourly();
+      const { summarizeRange } = await import('../src/maintenance.js');
+      await summarizeRange(pool, new Date('2026-11-02T02:00:00Z'), new Date('2026-11-02T03:00:00Z')); // jam 1 sahaja
+      expect((await pool.query(`SELECT count(DISTINCT hour)::int n FROM hourly_stats`)).rows[0].n).toBe(1);
+      sameHourly(await hourly(), before);
+    });
+
+    it('hourly: jam separa di hujung julat dikira daripada data mentah, bukan hourly_stats', async () => {
+      await seedFixture();
+      await summarizeAll();
+      const r = await request(app).get('/api/stats/hourly?from=2026-11-02T02:05:00Z&to=2026-11-02T03:00:00Z').expect(200);
+      expect(r.body.data).toHaveLength(1);
+      expect(r.body.data[0]).toMatchObject({ snapshots: 2, peakAircraft: 2 }); // 02:05 dan 02:10 sahaja, bukan 3 snapshot penuh
+      expect(r.body.data[0].avgAircraft).toBeCloseTo(1.5, 9);
+    });
+
+    it('density: kiraan grid, disusun ikut kiraan, boleh ditapis ikut lapangan terbang', async () => {
+      await seedFixture();
+      const r = await request(app).get(`/api/stats/density?${range}&grid=0.1`).expect(200);
+      expect(r.body).toMatchObject({ grid: 0.1, snapshots: 5 });
+      expect(r.body.data).toHaveLength(2);
+      expect(r.body.data[0].count).toBe(5); // KUL: 3 (jam 1) + 2 (jam 2)
+      expect(r.body.data[0].lat).toBeCloseTo(2.75, 4);
+      expect(r.body.data[0].lng).toBeCloseTo(101.75, 4);
+      expect(r.body.data[1]).toMatchObject({ count: 2 });
+      expect(r.body.data[1].lat).toBeCloseTo(5.35, 4);
+      const pen = await request(app).get(`/api/stats/density?${range}&airport=PEN`).expect(200);
+      expect(pen.body.data).toHaveLength(1);
+      expect(pen.body.data[0].count).toBe(2);
+    });
+
+    it('density: grid di luar had dihadkan, bukan ralat', async () => {
+      await seedFixture();
+      const r = await request(app).get(`/api/stats/density?${range}&grid=99`).expect(200);
+      expect(r.body.grid).toBe(1);
+    });
+
+    describe('POST /api/maintenance', () => {
+      it('401 tanpa / dengan rahsia salah, 503 jika rahsia server tiada', async () => {
+        await request(app).post('/api/maintenance').expect(401);
+        await request(app).post('/api/maintenance').set('x-collector-secret', 'salah').expect(401);
+        const open = createApp({ pool, config: { corsOrigin: '*', cacheTtlMs: 0 } });
+        await request(open).post('/api/maintenance').set(auth).expect(503);
+      });
+
+      it('data kosong: 200, tiada apa dipadam', async () => {
+        const r = await request(app).post('/api/maintenance').set(auth).expect(200);
+        expect(r.body).toMatchObject({ ok: true, summarizedRows: 0, deletedObservations: 0 });
+      });
+
+      it('retensi: ringkas dahulu, kemudian padam lebih 30 hari; snapshots dikekalkan; boleh diulang', async () => {
+        const now = new Date();
+        const oldT = new Date(hourFloor(new Date(now.getTime() - 45 * 24 * HOUR)).getTime() + 10 * 60000);
+        const recT = new Date(hourFloor(now).getTime() - 2 * HOUR + 10 * 60000); // jam penuh dalam 48 jam terakhir
+        await seed(oldT, [KUL, PEN]);
+        await seed(recT, [KUL]);
+
+        const r = await request(app).post('/api/maintenance').set(auth).expect(200);
+        expect(r.body).toMatchObject({ ok: true, deletedObservations: 2 });
+
+        expect((await pool.query('SELECT count(*)::int n FROM observations')).rows[0].n).toBe(1); // yang baru kekal
+        expect((await pool.query('SELECT count(*)::int n FROM snapshots')).rows[0].n).toBe(2);     // snapshots tidak dipadam
+
+        const stats = (h) => pool.query(
+          'SELECT airport, snapshots, aircraft_sum::int AS sum, peak_aircraft FROM hourly_stats WHERE hour = $1 ORDER BY airport', [h]);
+        expect((await stats(hourFloor(oldT))).rows).toEqual([
+          { airport: '*', snapshots: 1, sum: 2, peak_aircraft: 2 },
+          { airport: 'KUL', snapshots: 1, sum: 1, peak_aircraft: 1 },
+          { airport: 'PEN', snapshots: 1, sum: 1, peak_aircraft: 1 },
+        ]);
+        expect((await stats(hourFloor(recT))).rows[0]).toMatchObject({ airport: '*', sum: 1 });
+
+        // Sejarah lama masih boleh dibaca melalui /hourly walaupun data mentahnya sudah dipadam.
+        const from = hourFloor(oldT).toISOString();
+        const to = new Date(hourFloor(oldT).getTime() + HOUR).toISOString();
+        const h = await request(app).get(`/api/stats/hourly?from=${from}&to=${to}`).expect(200);
+        expect(h.body.data).toHaveLength(1);
+        expect(h.body.data[0]).toMatchObject({ snapshots: 1, peakAircraft: 2 });
+        expect(h.body.data[0].avgAircraft).toBeCloseTo(2, 9);
+
+        const before = (await pool.query('SELECT count(*)::int n FROM hourly_stats')).rows[0].n;
+        const again = await request(app).post('/api/maintenance').set(auth).expect(200);
+        expect(again.body.deletedObservations).toBe(0);
+        expect((await pool.query('SELECT count(*)::int n FROM hourly_stats')).rows[0].n).toBe(before);
+      });
+    });
+  });
+
   it('cache: respons kedua ditanda HIT', async () => {
     const cached = createApp({ pool, config: { collectorSecret: SECRET, corsOrigin: '*', cacheTtlMs: 60000 } });
     const a = await request(cached).get('/api/stats/airlines?from=2026-11-01&to=2026-11-03').expect(200);

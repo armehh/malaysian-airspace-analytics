@@ -49,19 +49,45 @@ export function statsRouter(pool) {
   }));
 
   // Purata pesawat bagi setiap jam (masa Malaysia), boleh ditapis ikut lapangan terbang.
+  // Jam penuh yang sudah diringkaskan dibaca daripada hourly_stats, jadi sejarah kekal selepas data
+  // mentah dipadam (retensi 30 hari). Data mentah (observations) hanya diimbas di kedua-dua hujung
+  // julat yang belum diringkaskan: jam separa di permulaan, dan jam terkini selepas ringkasan terakhir.
+  // Hasilnya sama dengan pengiraan penuh daripada data mentah.
   r.get('/hourly', wrap(async (req, res) => {
     const q = parse(rangeSchema, req.query);
     const { rows } = await pool.query(`
-      WITH s AS (SELECT id, taken_at FROM snapshots WHERE taken_at >= $1 AND taken_at < $2),
-      c AS (SELECT snapshot_id, count(*) AS n FROM observations
-            WHERE taken_at >= $1 AND taken_at < $2 AND ($3::text IS NULL OR nearest_apt = $3)
-            GROUP BY snapshot_id)
-      SELECT ${LABEL(`date_trunc('hour', s.taken_at AT TIME ZONE '${TZ}')`)} AS hour_myt,
-             avg(coalesce(c.n, 0))::float AS avg_aircraft,
-             max(coalesce(c.n, 0))::int   AS peak_aircraft,
-             count(*)::int                AS snapshots
-      FROM s LEFT JOIN c ON c.snapshot_id = s.id
-      GROUP BY date_trunc('hour', s.taken_at AT TIME ZONE '${TZ}') ORDER BY 1`,
+      WITH tot AS (
+        SELECT hour, snapshots FROM hourly_stats
+        WHERE airport = '*' AND hour >= $1::timestamptz AND hour + interval '1 hour' <= $2::timestamptz),
+      bounds AS (
+        SELECT coalesce(min(hour), $2::timestamptz) AS lo,
+               coalesce(max(hour) + interval '1 hour', $2::timestamptz) AS hi FROM tot),
+      sel AS (
+        SELECT t.hour, t.snapshots, coalesce(a.aircraft_sum, 0)::bigint AS sum_c, coalesce(a.peak_aircraft, 0)::int AS peak
+        FROM tot t LEFT JOIN hourly_stats a ON a.hour = t.hour AND a.airport = coalesce($3::text, '*')),
+      s AS (SELECT id, taken_at FROM snapshots
+            WHERE taken_at >= $1::timestamptz AND taken_at < $2::timestamptz
+              AND NOT EXISTS (SELECT 1 FROM tot WHERE tot.hour = date_trunc('hour', taken_at))),
+      c AS (
+        SELECT snapshot_id, count(*) AS n FROM (
+          SELECT snapshot_id FROM observations
+          WHERE taken_at >= $1::timestamptz AND taken_at < (SELECT lo FROM bounds)
+            AND ($3::text IS NULL OR nearest_apt = $3::text)
+          UNION ALL
+          SELECT snapshot_id FROM observations
+          WHERE taken_at >= (SELECT hi FROM bounds) AND taken_at < $2::timestamptz
+            AND ($3::text IS NULL OR nearest_apt = $3::text)) x
+        GROUP BY snapshot_id),
+      raw AS (
+        SELECT date_trunc('hour', s.taken_at) AS hour, count(*)::int AS snapshots,
+               sum(coalesce(c.n, 0))::bigint AS sum_c, max(coalesce(c.n, 0))::int AS peak
+        FROM s LEFT JOIN c ON c.snapshot_id = s.id GROUP BY 1),
+      u AS (SELECT * FROM sel UNION ALL SELECT * FROM raw)
+      SELECT ${LABEL(`u.hour AT TIME ZONE '${TZ}'`)} AS hour_myt,
+             (u.sum_c::float / u.snapshots) AS avg_aircraft,
+             u.peak AS peak_aircraft,
+             u.snapshots AS snapshots
+      FROM u ORDER BY u.hour`,
       [q.from, q.to, q.airport ?? null]);
     res.json({ airport: q.airport ?? null, from: q.from, to: q.to,
       data: rows.map((x) => ({ hourMyt: x.hour_myt, avgAircraft: x.avg_aircraft, peakAircraft: x.peak_aircraft, snapshots: x.snapshots })) });

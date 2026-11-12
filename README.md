@@ -98,7 +98,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | POST | `/api/maintenance` | Ringkas data ke `hourly_stats` dan padam `observations` lebih 30 hari (perlu header `x-collector-secret`) |
 | GET | `/api/health` | Semak hidup + sambungan DB |
 | GET | `/api/stats/overview` | Ringkasan terkini + trend 24 jam vs paras biasa |
-| GET | `/api/stats/hourly?airport=KUL&from=&to=` | Purata pesawat setiap jam (masa Malaysia) |
+| GET | `/api/stats/hourly?airport=KUL&from=&to=` | Purata pesawat setiap jam (masa Malaysia). Membaca `hourly_stats`, jadi sejarah kekal selepas 30 hari |
 | GET | `/api/stats/airports` | Senarai lapangan terbang |
 | GET | `/api/stats/airports/compare` | Banding lapangan terbang |
 | GET | `/api/stats/airports/:code/weekly` | Grid hari × jam |
@@ -119,6 +119,8 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 
 `hourly_stats` mempunyai satu baris bagi setiap (jam, lapangan terbang): `snapshots`, `aircraft_sum` dan `peak_aircraft`. Baris dengan `airport = '*'` mewakili semua pesawat. Purata dikira sebagai `aircraft_sum / snapshots`, jadi snapshot tanpa pesawat dikira 0, sama seperti `/hourly`. Jadual `snapshots` tidak dipadam kerana kecil (288 baris sehari).
 
+`/api/stats/hourly` membaca `hourly_stats` untuk jam penuh yang sudah diringkaskan. Data mentah hanya diimbas di dua hujung julat yang belum diringkaskan (jam separa di permulaan dan jam terkini), kerana ringkasan dijalankan sekali sehari. Hasilnya sama dengan pengiraan penuh daripada data mentah, dan sejarah jam demi jam kekal selepas data mentah dipadam.
+
 Ujian manual (tempatan):
 ```powershell
 $s = (Get-Content server\.env | Select-String '^COLLECTOR_SECRET=').Line.Split('=',2)[1]
@@ -134,13 +136,14 @@ Jangkaan: `{"ok":true,"summarizedRows":...,"deletedObservations":0,...}`.
 4. **Semua masa dikumpul dalam Asia/Kuala_Lumpur di SQL**, bukan di pelayar.
 5. **Penjadual luaran**, kerana pelan percuma Render tidur dan GitHub Actions cron boleh lewat beberapa minit.
 6. **Ringkas dahulu, baru padam.** Data mentah hanya dipadam selepas jamnya diringkaskan ke `hourly_stats`, dan ringkasan disahkan terhadap data mentah dengan query padanan (spot-check).
+7. **`/hourly` hibrid.** Ringkasan dibaca untuk jam penuh yang sudah diringkaskan, data mentah untuk selebihnya, supaya hasil sentiasa terkini dan sejarah lama kekal.
 
 ## Had yang diketahui
 
 - `nearest_apt` bermaksud pesawat berada dalam lingkungan **60 km** dari lapangan terbang, bukan bukti berlepas atau mendarat.
 - Data ADS-B awam tidak boleh diambil semula. Setiap hari collector tidak berjalan, data hari itu hilang. Dalam satu tempoh 24 jam yang diukur, 267 daripada 288 snapshot dijangka berjaya dikumpul (kira-kira 92.7%).
 - Corak mingguan hanya bermakna selepas beberapa minggu pengumpulan.
-- Selepas 30 hari, endpoint yang membaca `observations` (termasuk `/hourly` dan `/airports/compare`) tidak lagi mempunyai data bagi tarikh lama. Ringkasan lama kekal dalam `hourly_stats`.
+- Selepas 30 hari, data mentah (`observations`) dipadam. `/hourly` terus memberi sejarah jam demi jam daripada `hourly_stats`, tetapi endpoint yang masih membaca `observations` (`/airports/compare`, `/airports/:code/weekly`, `/airlines`, `/airlines/timeseries`, `/density`) hanya merangkumi 30 hari terakhir.
 - Semak terma penggunaan setiap penyedia feed sebelum menggunakan data ini secara komersial.
 
 ## Ujian
@@ -151,4 +154,11 @@ npm test                    # ujian unit sahaja jika tiada pangkalan data ujian
 TEST_DATABASE_URL=postgres://user:pass@localhost/airspace_test npm test   # termasuk ujian API
 ```
 
-CI (`.github/workflows/ci.yml`) menjalankan ujian server dengan Postgres 16.
+Dashboard:
+```bash
+cd client
+npm test                    # Vitest
+npm run build
+```
+
+CI (`.github/workflows/ci.yml`) menjalankan dua job: `server` (ujian dengan Postgres 16) dan `client` (`npm ci`, `npm test`, `npm run build`).

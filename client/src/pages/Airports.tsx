@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApi, type AirportList, type Compare, type Hourly, type Weekly } from '../lib/api';
 import '../airports.css';
+import CsvButton from '../components/CsvButton';
 
 const DAYS = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Isnin dahulu
@@ -25,6 +26,7 @@ export default function Airports() {
   const cells = new Map((weekly.data?.data ?? []).map((c) => [`${c.dow}-${c.hour}`, c]));
   const peakVal = Math.max(0, ...(weekly.data?.data ?? []).map((c) => c.avgAircraft));
   const peak = (weekly.data?.data ?? []).find((c) => c.avgAircraft === peakVal && peakVal > 0);
+  const days = (weekly.data?.data ?? []).reduce((a, c) => a + c.snapshots, 0) / 288; // 288 snapshot sehari
 
   return (
     <div className="split">
@@ -45,14 +47,17 @@ export default function Airports() {
 
       <div>
         <section className="panel">
-          <div className="picked"><h2>{code}</h2><span className="label" style={{ margin: 0 }}>{names[code ?? '']}</span></div>
-          {peak && <p className="busy">Paling sibuk: {DAYS[peak.dow]}, {String(peak.hour).padStart(2, '0')}:00 (purata {peak.avgAircraft.toFixed(1)} pesawat)</p>}
+          <div className="picked"><h2>{code}</h2><span className="label" style={{ margin: 0 }}>{names[code ?? '']}</span>
+            <CsvButton type="hourly" airport={code} />
+          </div>
+          {peak && days >= 2 && <p className="busy">Paling sibuk: {DAYS[peak.dow]}, {String(peak.hour).padStart(2, '0')}:00 (purata {peak.avgAircraft.toFixed(1)} pesawat, data ≈ {days.toFixed(1)} hari)</p>}
+          {peak && days < 2 && <p className="note">Data baru ≈ {days.toFixed(1)} hari. Ayat "paling sibuk" muncul selepas 2 hari.</p>}
           <div className="chart">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hourly.data?.data ?? []} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
                 <defs><linearGradient id="fillA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5cc8ff" stopOpacity={0.4} /><stop offset="100%" stopColor="#5cc8ff" stopOpacity={0} /></linearGradient></defs>
                 <CartesianGrid stroke="#1f3b53" vertical={false} />
-                <XAxis dataKey="hourMyt" tickFormatter={(v: string) => v.slice(5, 10)} stroke="#8aa3b8" tickLine={false} minTickGap={48} />
+                <XAxis dataKey="hourMyt" tickFormatter={(v: string) => v.slice(5, 16).replace('T', ' ')} stroke="#8aa3b8" tickLine={false} minTickGap={72} />
                 <YAxis stroke="#8aa3b8" tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={{ background: '#0f2233', border: '1px solid #1f3b53', borderRadius: 8, color: '#e6eef5' }} labelFormatter={(v) => String(v).replace('T', ' ')} formatter={(v) => (typeof v === 'number' ? v.toFixed(1) : v)} />
                 <Area dataKey="avgAircraft" name="Purata pesawat" stroke="#5cc8ff" strokeWidth={2} fill="url(#fillA)" dot={false} isAnimationActive={false} />

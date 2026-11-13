@@ -105,6 +105,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | GET | `/api/stats/airlines` | Ranking syarikat penerbangan |
 | GET | `/api/stats/airlines/timeseries?bucket=day` | Siri masa syarikat |
 | GET | `/api/stats/density?from=&to=&grid=0.1` | Kiraan kedudukan pesawat mengikut grid darjah (untuk peta) |
+| GET | `/api/stats/export.csv?type=hourly&airport=KUL` | Muat turun CSV. `type` ialah `hourly` atau `airlines`; `airport`, `from`, `to`, `top` pilihan. Julat dan had sama seperti endpoint JSON |
 | GET | `/api/stats/collector` | Kadar kejayaan collector |
 
 `from` dan `to` ialah tarikh ISO. Lalai ialah 7 hari terakhir, maksimum 90 hari.

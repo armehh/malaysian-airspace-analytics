@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApi, type AirlineSeries, type Airlines as AirlinesData } from '../lib/api';
 import { airlineColor } from '../lib/airlineColors';
+import CsvButton from '../components/CsvButton';
 import '../airports.css';
 import '../airlines.css';
 
@@ -46,6 +47,7 @@ export default function Airlines() {
       <section className="panel">
         <h2>Syarikat tersibuk</h2>
         <p className="label" style={{ margin: 0 }}>Purata pesawat diperhatikan, 7 hari terakhir</p>
+        <CsvButton type="airlines" top={10} />
         <div className="rank">
           {ranked.map((r) => (
             <div className="arow" key={r.airline} title={`${r.observations.toLocaleString()} pemerhatian`}>

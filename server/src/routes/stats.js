@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AIRPORTS } from '../lib/airports.js';
 import { rangeSchema, airportParam, parse } from '../lib/validate.js';
+import { toCsv, num, exportTypeSchema, csvFilename } from '../lib/csv.js';
 
 const TZ = 'Asia/Kuala_Lumpur';
 // Label masa tempatan Malaysia sebagai teks (elak masalah zon masa pemacu pg).
@@ -53,8 +54,7 @@ export function statsRouter(pool) {
   // mentah dipadam (retensi 30 hari). Data mentah (observations) hanya diimbas di kedua-dua hujung
   // julat yang belum diringkaskan: jam separa di permulaan, dan jam terkini selepas ringkasan terakhir.
   // Hasilnya sama dengan pengiraan penuh daripada data mentah.
-  r.get('/hourly', wrap(async (req, res) => {
-    const q = parse(rangeSchema, req.query);
+  const hourlyData = async (q) => {
     const { rows } = await pool.query(`
       WITH tot AS (
         SELECT hour, snapshots FROM hourly_stats
@@ -89,8 +89,11 @@ export function statsRouter(pool) {
              u.snapshots AS snapshots
       FROM u ORDER BY u.hour`,
       [q.from, q.to, q.airport ?? null]);
-    res.json({ airport: q.airport ?? null, from: q.from, to: q.to,
-      data: rows.map((x) => ({ hourMyt: x.hour_myt, avgAircraft: x.avg_aircraft, peakAircraft: x.peak_aircraft, snapshots: x.snapshots })) });
+    return rows.map((x) => ({ hourMyt: x.hour_myt, avgAircraft: x.avg_aircraft, peakAircraft: x.peak_aircraft, snapshots: x.snapshots }));
+  };
+  r.get('/hourly', wrap(async (req, res) => {
+    const q = parse(rangeSchema, req.query);
+    res.json({ airport: q.airport ?? null, from: q.from, to: q.to, data: await hourlyData(q) });
   }));
 
   // Bandingkan lapangan terbang: purata pesawat berdekatan bagi setiap snapshot.
@@ -122,8 +125,7 @@ export function statsRouter(pool) {
   }));
 
   // Ranking syarikat penerbangan.
-  r.get('/airlines', wrap(async (req, res) => {
-    const q = parse(rangeSchema, req.query);
+  const airlinesData = async (q) => {
     const { rows } = await pool.query(`
       WITH n AS (SELECT count(*)::float AS total FROM snapshots WHERE taken_at >= $1 AND taken_at < $2),
       t AS (SELECT count(*)::float AS total FROM observations WHERE taken_at >= $1 AND taken_at < $2)
@@ -132,8 +134,11 @@ export function statsRouter(pool) {
              count(*)::float / NULLIF((SELECT total FROM t), 0) AS share
       FROM observations WHERE taken_at >= $1 AND taken_at < $2
       GROUP BY 1 ORDER BY 2 DESC LIMIT $3`, [q.from, q.to, q.top]);
-    res.json({ from: q.from, to: q.to,
-      data: rows.map((x) => ({ airline: x.airline, observations: x.observations, avgAircraft: x.avg_aircraft, share: x.share })) });
+    return rows.map((x) => ({ airline: x.airline, observations: x.observations, avgAircraft: x.avg_aircraft, share: x.share }));
+  };
+  r.get('/airlines', wrap(async (req, res) => {
+    const q = parse(rangeSchema, req.query);
+    res.json({ from: q.from, to: q.to, data: await airlinesData(q) });
   }));
 
   // Siri masa untuk carta area bertindih (N syarikat teratas + "Lain-lain").
@@ -172,6 +177,19 @@ export function statsRouter(pool) {
     res.json({ from: q.from, to: q.to, grid, snapshots: snaps.rows[0].n,
       data: cells.rows.map((x) => ({ lat: x.glat, lng: x.glng, count: x.c })) });
   }));
+  // Muat turun CSV: type=hourly (boleh tapis airport) atau type=airlines. Julat sama seperti endpoint JSON.
+  r.get('/export.csv', wrap(async (req, res) => {
+    const { type } = parse(exportTypeSchema, req.query);
+    const q = parse(rangeSchema, req.query);
+    const rows = type === 'hourly'
+      ? [['hour_myt', 'airport', 'avg_aircraft', 'peak_aircraft', 'snapshots'],
+         ...(await hourlyData(q)).map((x) => [x.hourMyt, q.airport ?? 'ALL', num(x.avgAircraft), x.peakAircraft, x.snapshots])]
+      : [['airline', 'observations', 'avg_aircraft', 'share_pct'],
+         ...(await airlinesData(q)).map((x) => [x.airline, x.observations, num(x.avgAircraft), num(x.share == null ? null : x.share * 100)])];
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${csvFilename(type, q)}"` });
+    res.send(toCsv(rows));
+  }));
+
   // Kesihatan collector: kadar kejayaan & jurang.
   r.get('/collector', wrap(async (req, res) => {
     const q = parse(rangeSchema, req.query);

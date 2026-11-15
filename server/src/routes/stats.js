@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AIRPORTS } from '../lib/airports.js';
 import { rangeSchema, airportParam, parse } from '../lib/validate.js';
 import { toCsv, num, exportTypeSchema, csvFilename } from '../lib/csv.js';
+import { buildWorkbook, XLSX_MIME, xlsxFilename } from '../lib/xlsx.js';
 
 const TZ = 'Asia/Kuala_Lumpur';
 // Label masa tempatan Malaysia sebagai teks (elak masalah zon masa pemacu pg).
@@ -188,6 +189,17 @@ export function statsRouter(pool) {
          ...(await airlinesData(q)).map((x) => [x.airline, x.observations, num(x.avgAircraft), num(x.share == null ? null : x.share * 100)])];
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${csvFilename(type, q)}"` });
     res.send(toCsv(rows));
+  }));
+
+  // Muat turun Excel (.xlsx) bertema: type=hourly (boleh tapis airport) atau type=airlines. Julat sama seperti endpoint JSON.
+  r.get('/export.xlsx', wrap(async (req, res) => {
+    const { type } = parse(exportTypeSchema, req.query);
+    const q = parse(rangeSchema, req.query);
+    const data = type === 'hourly' ? await hourlyData(q) : await airlinesData(q);
+    const airport = q.airport ? (AIRPORTS.find((a) => a.code === q.airport) ?? { code: q.airport }) : null;
+    const file = await buildWorkbook({ type, q, data, airport });
+    res.set({ 'Content-Type': XLSX_MIME, 'Content-Disposition': `attachment; filename="${xlsxFilename(csvFilename(type, q))}"` });
+    res.send(file);
   }));
 
   // Kesihatan collector: kadar kejayaan & jurang.

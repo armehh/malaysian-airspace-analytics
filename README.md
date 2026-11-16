@@ -27,6 +27,7 @@ Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada perminta
 - **Lapangan terbang**: ranking, carta setiap jam, dan grid corak mingguan (hari × jam) bagi setiap lapangan terbang
 - **Syarikat**: ranking dan carta campuran syarikat mengikut masa
 - **Peta**: kepadatan kedudukan pesawat (24 jam, 7 hari, 30 hari)
+- **Eksport**: muat turun CSV (data mentah) dan Excel bertema (`.xlsx` dengan ringkasan KPI, bar data dan penapis) untuk jadual jam dan ranking syarikat
 - **Ringkasan setiap jam dan retensi**: jadual `hourly_stats` menyimpan ringkasan kekal, manakala data mentah (`observations`) dipadam selepas 30 hari
 
 Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan datang.
@@ -36,7 +37,7 @@ Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan data
 | Lapisan | Pilihan |
 |---|---|
 | Pangkalan data | PostgreSQL (Neon, wilayah Singapore) |
-| API | Node.js 20+, Express 5, Zod, `pg` |
+| API | Node.js 20+, Express 5, Zod, `pg`, `exceljs` (eksport Excel) |
 | Dashboard | React, TypeScript, Vite, Recharts, Leaflet |
 | Ujian | Vitest, Supertest |
 | Hos | Render (API dan laman statik), cron-job.org (penjadual) |
@@ -72,7 +73,7 @@ echo VITE_API_URL=http://localhost:3000 > .env.local
 npm run dev                 # http://localhost:5173
 ```
 
-Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-airspace-analytics.onrender.com`.
+Server tempatan memerlukan `server/.env` (salin `.env.example`; `CORS_ORIGIN=http://localhost:5173`). Server dan dashboard dijalankan dalam dua tetingkap berasingan. Dashboard tempatan tidak boleh membaca API di Render secara terus kerana `CORS_ORIGIN` di Render hanya membenarkan URL dashboard.
 
 ### Nota untuk Windows (PowerShell)
 - Guna `curl.exe`, bukan `curl` (alias PowerShell berbeza).
@@ -106,6 +107,7 @@ Untuk membaca API yang sudah di-deploy, letak `VITE_API_URL=https://malaysian-ai
 | GET | `/api/stats/airlines/timeseries?bucket=day` | Siri masa syarikat |
 | GET | `/api/stats/density?from=&to=&grid=0.1` | Kiraan kedudukan pesawat mengikut grid darjah (untuk peta) |
 | GET | `/api/stats/export.csv?type=hourly&airport=KUL` | Muat turun CSV. `type` ialah `hourly` atau `airlines`; `airport`, `from`, `to`, `top` pilihan. Julat dan had sama seperti endpoint JSON |
+| GET | `/api/stats/export.xlsx?type=hourly&airport=KUL` | Muat turun Excel bertema. Parameter dan had sama seperti `export.csv`. `type=hourly` memberi helaian Ringkasan dan Data, `type=airlines` memberi helaian Ranking |
 | GET | `/api/stats/collector` | Kadar kejayaan collector |
 
 `from` dan `to` ialah tarikh ISO. Lalai ialah 7 hari terakhir, maksimum 90 hari.

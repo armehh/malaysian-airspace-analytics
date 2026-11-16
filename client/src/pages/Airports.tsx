@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApi, type AirportList, type Compare, type Hourly, type Weekly } from '../lib/api';
 import '../airports.css';
-import CsvButton from '../components/CsvButton';
+import ExportButtons from '../components/ExportButtons';
 
 const DAYS = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Isnin dahulu
@@ -48,7 +48,7 @@ export default function Airports() {
       <div>
         <section className="panel">
           <div className="picked"><h2>{code}</h2><span className="label" style={{ margin: 0 }}>{names[code ?? '']}</span>
-            <CsvButton type="hourly" airport={code} />
+            <ExportButtons type="hourly" airport={code} />
           </div>
           {peak && days >= 2 && <p className="busy">Paling sibuk: {DAYS[peak.dow]}, {String(peak.hour).padStart(2, '0')}:00 (purata {peak.avgAircraft.toFixed(1)} pesawat, data ≈ {days.toFixed(1)} hari)</p>}
           {peak && days < 2 && <p className="note">Data baru ≈ {days.toFixed(1)} hari. Ayat "paling sibuk" muncul selepas 2 hari.</p>}

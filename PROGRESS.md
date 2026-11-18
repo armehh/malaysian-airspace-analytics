@@ -5,7 +5,7 @@ Rujukan pantas untuk menyambung kerja pada bila-bila masa.
 
 ## Ringkasan
 
-Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepadatan) sudah **hidup di internet**. Data dikumpul setiap 5 minit sejak 10 November 2026. **Fasa 4 selesai** (`hourly_stats`, `/api/maintenance`, `/hourly` hibrid). **Fasa 5 sedang berjalan**: ujian dashboard dan job `client` dalam CI, eksport CSV beserta butang pada dashboard, dan eksport Excel bertema (`export.xlsx`) di server sudah di-push. Eksport Excel **belum disahkan di Render** dan **butang Excel belum ada pada dashboard**. Kerja yang tinggal: sahkan Excel, butang Excel, PDF, tangkapan skrin dan dokumentasi akhir.
+Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepadatan) sudah **hidup di internet**. Data dikumpul setiap 5 minit sejak 10 November 2026. **Fasa 4 selesai** (`hourly_stats`, `/api/maintenance`, `/hourly` hibrid). **Fasa 5 hampir siap**: ujian dashboard dan job `client` dalam CI, eksport CSV dan Excel bertema (`export.csv`, `export.xlsx`) beserta butang muat turun pada dashboard sudah hidup. Eksport Excel dan butangnya disahkan berfungsi di Render. Kerja yang tinggal: **betulkan CI** (commit `d98842c` bertanda X merah), PDF (pilihan), tangkapan skrin dan dokumentasi akhir.
 
 ## Status mengikut fasa
 
@@ -21,8 +21,8 @@ Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepada
 | 5 | Ujian dashboard (Vitest) + job `client` dalam CI | Siap, di-push (`ea33fdd`) |
 | 5 | Eksport CSV (`/api/stats/export.csv`) | Siap, hidup, disahkan di Render (`1cc255c`) |
 | 5 | Butang "Muat turun CSV" (Lapangan terbang, Syarikat) | Siap, hidup (`f7f9dd7`) |
-| 5 | Eksport Excel bertema (`/api/stats/export.xlsx`) | Di-push (`ee41b31`). Ujian unit lulus tempatan. Belum disahkan di Render dan CI belum disemak |
-| 5 | Butang "Muat turun Excel" pada dashboard | Belum |
+| 5 | Eksport Excel bertema (`/api/stats/export.xlsx`) | Siap, hidup, disahkan di Render (`ee41b31`). Muat turun dua kali berturut-turut berfungsi |
+| 5 | Butang "Muat turun Excel" pada dashboard | Siap, hidup (`d98842c`), di sebelah butang CSV pada halaman Lapangan terbang dan Syarikat |
 | 5 | Eksport PDF | Belum |
 | 5 | Tangkapan skrin dan dokumentasi akhir | Belum |
 
@@ -65,17 +65,17 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
   - Data sekitar 3 hari di Neon: query lama **4.11 ms** (Execution Time dalam tab Plan, larian pertama). Nombor query baharu **belum direkodkan**.
   - Data sintetik 30 hari di komputer tempatan (kira-kira 408,000 baris `observations`, KUL): 7 hari 17 ms ke 3 ms, 30 hari 55 ms ke 5 ms, hasil sama pada 32 kombinasi julat dan lapangan terbang.
   - Dalam laporan, tulis bahawa pada data beberapa hari kedua-dua query di bawah 5 ms, dan ukuran diulang apabila data mencapai 30 hari (sekitar 10 Disember). Jangan tulis "3× lebih laju". Faedah sebenar: selepas hari ke-30 hanya query baharu mempunyai sejarah jam demi jam.
-- **Ujian**: server 25 lulus dan 37 dilangkau (di komputer tanpa Postgres). Yang dilangkau (25 dalam `api.test.js`, 6 dalam `export.test.js`, 6 dalam `export-xlsx.test.js`) memerlukan `TEST_DATABASE_URL` dan dijalankan oleh CI. Client 9 lulus (5 `airlineColors`, 4 `csvUrl`).
+- **Ujian**: server 25 lulus dan 37 dilangkau (di komputer tanpa Postgres). Yang dilangkau (25 dalam `api.test.js`, 6 dalam `export.test.js`, 6 dalam `export-xlsx.test.js`) memerlukan `TEST_DATABASE_URL` dan dijalankan oleh CI. Client 11 lulus (5 `airlineColors`, selebihnya `csvUrl`).
 
 ## Isu diketahui dan hutang teknikal
 
-- **CI belum disahkan.** Semak tab **Actions** di GitHub untuk `1cc255c`, `f7f9dd7` dan `ee41b31`: job `server` dan `client` mesti hijau. Di situ ujian Postgres (termasuk 6 ujian laluan `export.xlsx`) dijalankan buat kali pertama.
-- **Eksport Excel belum diuji di Render.** Muat turun `export.xlsx` dua kali berturut-turut dan buka kedua-duanya, untuk memastikan middleware cache (`server/src/lib/cache.js`, belum disemak) tidak merosakkan respons binari.
+- **CI tidak hijau.** Commit `d98842c` bertanda X merah di GitHub (dilihat 16 Nov). Buka tab **Actions**, kenal pasti job yang gagal dan baris ralat pertama. Kemungkinan `server`, kerana ujian Postgres (termasuk 6 ujian laluan `export.xlsx`) dijalankan di situ buat kali pertama. Kemungkinan lain ialah `npm ci` pada job `client` jika `client/package-lock.json` tidak selari dengan `package.json`. Dashboard tetap hidup kerana Render membina berasingan daripada CI.
+- ~~Eksport Excel belum diuji di Render.~~ **Selesai (16 Nov).** `export.xlsx` dimuat turun dua kali berturut-turut dan dibuka dengan betul, jadi middleware cache tidak merosakkan respons binari. Fail yang dibuka: Lapangan terbang (helaian "Ringkasan" dan "Data") dan Syarikat (helaian "Ranking").
 - Garis "Paras biasa" belum muncul sehingga data melebihi sehari (jangkaan).
 - Bundle JS utama 628 kB (amaran Vite). Peta (Leaflet) sudah dipecahkan ke chunk berasingan.
 - **Selepas 30 hari**, `/hourly` masih memberi sejarah lama (daripada `hourly_stats`), tetapi `/airports/compare`, `/airports/:code/weekly`, `/airlines`, `/airlines/timeseries` dan `/density` membaca `observations` dan hanya merangkumi 30 hari terakhir. Corak mingguan dan syarikat tidak diringkaskan.
 - IndiGo muncul dalam ranking tetapi tiada warna tetap dalam `airlineColors.ts` (guna warna sandaran). "Tidak dikenal pasti" berada di tempat ke-4, jadi semak sama ada awalan callsign yang kerap muncul belum ada dalam `airlines.js`.
-- Jadual cron `airspace-maintenance`: semak "Next execution" ialah 04:00 pagi (zon Asia/Kuala_Lumpur), bukan 16:00. Sahkan larian terakhir kedua-dua job cron ialah 200 dan `COLLECTOR_SECRET` sama pada kedua-duanya.
+- Jadual cron `airspace-maintenance`: semak "Next execution" ialah 04:00 pagi (zon Asia/Kuala_Lumpur), bukan 16:00. Sahkan larian terakhir kedua-dua job cron ialah 200 dan `COLLECTOR_SECRET` sama pada kedua-duanya. Pemerhatian 16 Nov: `max(hour)` dalam `hourly_stats` ialah 2026-11-15 19:00 UTC (03:00 MYT), konsisten dengan cron 04:00 yang berjalan, tetapi HISTORY di cron-job.org belum disemak.
 - Pemantauan Neon: semak jam pengiraan percuma, dan saiz pangkalan data selepas seminggu:
   ```sql
   SELECT pg_size_pretty(pg_database_size(current_database()));
@@ -92,8 +92,8 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 
 ## Seterusnya (urutan cadangan)
 
-1. Semak tab **Actions** (server dan client hijau) dan sahkan `export.xlsx` di Render (muat turun dua kali, buka kedua-duanya).
-2. Tambah butang **"Muat turun Excel"** di sebelah butang CSV pada halaman Lapangan terbang dan Syarikat.
+1. **Betulkan CI** untuk `d98842c`: kenal pasti job yang gagal dalam tab **Actions** dan pastikan `server` dan `client` hijau.
+2. ~~Butang "Muat turun Excel"~~ Siap (`d98842c`).
 3. Sahkan cron harian: selepas 04:00, `SELECT max(hour) FROM hourly_stats WHERE airport = '*';` patut dalam sejam terakhir, dan `deletedObservations` kekal 0 sehingga data melebihi 30 hari.
 4. Rekod Execution Time query baharu daripada Neon (tab Plan) untuk `explain-hourly.sql`.
 5. Eksport PDF (`/api/stats/export.pdf`, `pdfkit`): tajuk, julat tarikh, jadual 10 teratas dan nota "diperhatikan oleh feed ADS-B".
@@ -158,3 +158,4 @@ Jangan jalankan ini jika `DATABASE_URL` tempatan menunjuk ke Neon production, me
 - **12 Nov 2026**: `/api/maintenance` disahkan di Render (200, 486 baris diringkaskan, 0 dipadam, cutoff 13 Okt). `/hourly` kini membaca `hourly_stats` (hujung julat yang belum diringkaskan masih dibaca daripada `observations`), commit `32e23e8`, dengan ujian baharu untuk `/hourly`, `/density` dan `/maintenance`. Fasa 4 ditutup. `COLLECTOR_SECRET` ditukar kerana terdedah dalam output terminal, dan cron job harian untuk `/api/maintenance` dicipta. Fasa 5 bermula: Vitest dipasang dalam `client` dan job `client` ditambah dalam `ci.yml` (`ea33fdd`).
 - **13 hingga 15 Nov 2026**: eksport CSV (`/api/stats/export.csv`, `1cc255c`), disahkan di Render. Butang "Muat turun CSV" pada halaman Lapangan terbang dan Syarikat, ayat "Paling sibuk" hanya bila data melebihi 2 hari, dan label paksi X dengan jam (`f7f9dd7`).
 - **15 Nov 2026**: eksport Excel bertema (`/api/stats/export.xlsx`, `ee41b31`) dengan `exceljs`, ujian unit dan ujian laluan baharu. Kerja disambung pada komputer lain (klon baharu), dan masalah pemasangan rolldown di Windows dicatat di atas.
+- **16 Nov 2026**: butang "Muat turun Excel" (di sebelah butang CSV) pada halaman Lapangan terbang dan Syarikat di-push (`d98842c`), dan README serta PROGRESS dikemas kini (`b9dd70d`). Eksport Excel disahkan di Render: muat turun dua kali berturut-turut berfungsi, jadi cache tidak merosakkan respons binari. Ayat "Paling sibuk" menunjukkan `data ≈ 5.6 hari`. Commit `d98842c` bertanda X merah di GitHub: job CI yang gagal belum dikenal pasti.

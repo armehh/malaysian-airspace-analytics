@@ -18,6 +18,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: server/package-lock.json }
       - run: npm ci
+      - name: Pasang binari rolldown untuk Linux
+        run: |
+          V=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/rolldown/package.json','utf8')).version")
+          npm install --no-save "@rolldown/binding-linux-x64-gnu@$V"
       - run: npm test
 
   client:

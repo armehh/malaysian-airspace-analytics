@@ -49,6 +49,9 @@ server/   API, collector, penyelenggaraan, skema SQL, ujian
 client/   Dashboard React + Vite
 .github/  CI dan penjadual alternatif
 GUIDE.md  Panduan pembinaan langkah demi langkah
+PROGRESS.md  Status terkini dan log perubahan
+PROPOSAL.md  Cadangan projek, kriteria kejayaan dan risiko
+explain-hourly.sql  EXPLAIN ANALYZE sebelum dan selepas untuk /hourly
 ```
 
 ## Mula pantas (tempatan)
@@ -116,7 +119,7 @@ Server tempatan memerlukan `server/.env` (salin `.env.example`; `CORS_ORIGIN=htt
 
 `POST /api/maintenance` dipanggil sekali sehari (cron-job.org, 04:00 Asia/Kuala_Lumpur) dan melakukan tiga perkara mengikut urutan:
 
-1. Meringkaskan 48 jam terakhir ke `hourly_stats` (jam penuh sahaja). Selamat dijalankan berulang kali.
+1. Meringkaskan 48 jam terakhir ke `hourly_stats` (jam penuh sahaja). Jika jam terakhir dalam `hourly_stats` lebih lama daripada 48 jam (contohnya selepas gangguan panjang), ringkasan bermula dari jam itu, dihadkan kepada tempoh retensi 30 hari. Selamat dijalankan berulang kali.
 2. Meringkaskan semua jam yang akan dipadam.
 3. Memadam `observations` yang lebih 30 hari.
 
@@ -140,12 +143,33 @@ Jangkaan: `{"ok":true,"summarizedRows":...,"deletedObservations":0,...}`.
 5. **Penjadual luaran**, kerana pelan percuma Render tidur dan GitHub Actions cron boleh lewat beberapa minit.
 6. **Ringkas dahulu, baru padam.** Data mentah hanya dipadam selepas jamnya diringkaskan ke `hourly_stats`, dan ringkasan disahkan terhadap data mentah dengan query padanan (spot-check).
 7. **`/hourly` hibrid.** Ringkasan dibaca untuk jam penuh yang sudah diringkaskan, data mentah untuk selebihnya, supaya hasil sentiasa terkini dan sejarah lama kekal.
+8. **Ringkasan mesti pulih sendiri selepas gangguan.** Tetingkap tetap 48 jam tidak cukup bila collector atau cron terhenti lebih lama, kerana jam yang terlepas jatuh di luar tetingkap dan `/hourly` menganggapnya sudah diringkaskan (dipaparkan sebagai 0 pesawat). Maintenance kini bermula dari jam terakhir yang diringkaskan.
+
+## Hasil ukuran dan pelajaran
+
+Diukur pada data sekitar 9 hari (termasuk jurang 52 jam), 19 November 2026. Ukuran diulang apabila data mencapai 30 hari (sekitar 10 Disember).
+
+| Perkara | Hasil |
+|---|---|
+| Kadar pengumpulan | 267 daripada 288 snapshot dijangka (92.7%) dalam satu tempoh 24 jam. Belum diukur semula dengan mengambil kira jurang 52 jam |
+| Ringkasan lawan data mentah | Spot-check 24 jam (267 snapshot, 13,259 jumlah pesawat): 0 percanggahan untuk semua pesawat dan untuk KUL |
+| Masa query `/hourly` (KUL, 7 hari, kira-kira 4.6 hari berdata) | Query lama 5.96 ms, query baharu 1.92 ms (Execution Time terendah daripada larian berulang, `EXPLAIN (ANALYZE, BUFFERS)` di Neon). Skrip: `explain-hourly.sql` |
+| Masa query pada data sintetik 30 hari (tempatan, kira-kira 408,000 baris) | 7 hari: 17 ms ke 3 ms. 30 hari: 55 ms ke 5 ms. Hasil sama pada 32 kombinasi julat dan lapangan terbang |
+| Anggaran storan | Kira-kira 13,300 baris `observations` sehari, kira-kira 0.4 juta selepas 30 hari |
+
+Pada data beberapa hari kedua-dua query ringan. Faedah sebenar jadual ringkasan ialah sejarah jam demi jam yang kekal selepas data mentah dipadam.
+
+### Dua kejadian sebenar
+
+1. **Collector terhenti kira-kira 52 jam (16 hingga 18 Nov).** Jadual `airspace-collect` di cron-job.org tersilap ditetapkan sekali sehari. Data ADS-B awam tidak boleh diambil semula, jadi jurang itu kekal dan ditandakan pada carta, bukan diisi dengan 0. Pelajaran: selepas mengubah jadual cron, sahkan "Next execution" dan larian berjaya yang pertama.
+2. **Jam sifar palsu pada `/hourly`.** `hourly_stats` berhenti pada 16 Nov 03:00 MYT, jadi jam 04:00 hingga 11:00 tidak pernah diringkaskan dan carta KUL menunjukkan 0 pesawat, angka palsu dan bukan trafik sebenar. Punca (yakin separa): maintenance hanya meringkaskan 48 jam terakhir, jadi jam yang terlepas semasa gangguan jatuh di luar tetingkap itu, dan query hibrid menganggap jam di tengah julat sudah diringkaskan. Data dibetulkan dengan upsert sekali jalan dan disahkan terhadap `observations`, kemudian maintenance dibetulkan supaya bermula dari jam terakhir yang diringkaskan. Pembetulan kekal diuji dengan pool tiruan dan CI, dan larian harian sebenar pertama selepas pembetulan ialah 20 Nov. Pelajaran: ringkasan yang idempotent mesti boleh pulih daripada gangguan yang lebih panjang daripada tetingkapnya, dan sentiasa sahkan ringkasan terhadap data mentah.
 
 ## Had yang diketahui
 
 - `nearest_apt` bermaksud pesawat berada dalam lingkungan **60 km** dari lapangan terbang, bukan bukti berlepas atau mendarat.
-- Data ADS-B awam tidak boleh diambil semula. Setiap hari collector tidak berjalan, data hari itu hilang. Dalam satu tempoh 24 jam yang diukur, 267 daripada 288 snapshot dijangka berjaya dikumpul (kira-kira 92.7%).
+- Data ADS-B awam tidak boleh diambil semula. Setiap hari collector tidak berjalan, data hari itu hilang. Dalam satu tempoh 24 jam yang diukur, 267 daripada 288 snapshot dijangka berjaya dikumpul (kira-kira 92.7%). Collector juga terhenti kira-kira 52 jam pada 16 hingga 18 Nov 2026 kerana jadual cron tersilap, dan data itu tidak boleh diambil semula.
 - Corak mingguan hanya bermakna selepas beberapa minggu pengumpulan.
+- **"Tidak dikenal pasti"**: kira-kira separuh pemerhatian tiada callsign, dan separuh lagi menggunakan nombor pendaftaran pesawat (9M-, N, T7-, VP-, VH-, HS-) sebagai callsign, iaitu penerbangan am dan jet korporat. Bukan syarikat penerbangan komersial yang tiada dalam pemetaan. Syarikat disimpan semasa pengumpulan, jadi perubahan pemetaan hanya terpakai pada data masa depan.
 - Selepas 30 hari, data mentah (`observations`) dipadam. `/hourly` terus memberi sejarah jam demi jam daripada `hourly_stats`, tetapi endpoint yang masih membaca `observations` (`/airports/compare`, `/airports/:code/weekly`, `/airlines`, `/airlines/timeseries`, `/density`) hanya merangkumi 30 hari terakhir.
 - Semak terma penggunaan setiap penyedia feed sebelum menggunakan data ini secara komersial.
 

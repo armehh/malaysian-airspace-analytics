@@ -5,7 +5,7 @@ Rujukan pantas untuk menyambung kerja pada bila-bila masa.
 
 ## Ringkasan
 
-Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepadatan) sudah **hidup di internet**. Data dikumpul setiap 5 minit sejak 10 November 2026. **Fasa 4 selesai** (`hourly_stats`, `/api/maintenance`, `/hourly` hibrid). **Fasa 5 hampir siap**: ujian dashboard dan job `client` dalam CI, eksport CSV dan Excel bertema (`export.csv`, `export.xlsx`) beserta butang muat turun pada dashboard sudah hidup. Eksport Excel dan butangnya disahkan berfungsi di Render. **CI hijau** (`a4e6456`). Collector terhenti kira-kira 52 jam (16 hingga 18 Nov) kerana jadual cron tersilap, dan sudah dipulihkan. Kerja yang tinggal: PDF (pilihan), tangkapan skrin dan dokumentasi akhir.
+Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepadatan) sudah **hidup di internet**. Data dikumpul setiap 5 minit sejak 10 November 2026. **Fasa 4 selesai** (`hourly_stats`, `/api/maintenance`, `/hourly` hibrid). **Fasa 5 hampir siap**: ujian dashboard dan job `client` dalam CI, eksport CSV dan Excel bertema (`export.csv`, `export.xlsx`) beserta butang muat turun pada dashboard sudah hidup. Eksport Excel dan butangnya disahkan berfungsi di Render. **CI hijau** (`ff4acc0`, larian #25). Collector terhenti kira-kira 52 jam (16 hingga 18 Nov) kerana jadual cron tersilap, dan sudah dipulihkan. Pembetulan `maintenance.js` (`88b04ba`) dan warna IndiGo (`ff4acc0`) sudah di-push dengan CI hijau, dan EXPLAIN `/hourly` sudah direkodkan (5.96 ms lawan 1.92 ms). Kerja yang tinggal: pengesahan larian maintenance 04:00 (20 Nov), PDF (pilihan), tangkapan skrin dan dokumentasi akhir.
 
 ## Status mengikut fasa
 
@@ -23,7 +23,10 @@ Collector, API dan dashboard (Ringkasan, Lapangan terbang, Syarikat, Peta kepada
 | 5 | Butang "Muat turun CSV" (Lapangan terbang, Syarikat) | Siap, hidup (`f7f9dd7`) |
 | 5 | Eksport Excel bertema (`/api/stats/export.xlsx`) | Siap, hidup, disahkan di Render (`ee41b31`). Muat turun dua kali berturut-turut berfungsi |
 | 5 | Butang "Muat turun Excel" pada dashboard | Siap, hidup (`d98842c`), di sebelah butang CSV pada halaman Lapangan terbang dan Syarikat |
-| 5 | CI (job `server` dan `client`) | Hijau (`a4e6456`). Pembetulan: binari rolldown Linux dipasang dalam `ci.yml` |
+| 5 | CI (job `server` dan `client`) | Hijau (`ff4acc0`, larian #25. `88b04ba` hijau pada #24). Pembetulan: binari rolldown Linux dipasang dalam `ci.yml` |
+| 4 | Pembetulan `maintenance.js`: ringkas dari jam terakhir jika gangguan melebihi 48 jam | Siap, di-push (`88b04ba`), CI hijau (#24). Pengesahan sebenar di Neon: larian maintenance 04:00 pada 20 Nov |
+| 5 | Warna tetap IndiGo (`airlineColors.ts`) | Siap, di-push (`ff4acc0`), CI hijau (#25), disahkan pada dashboard (halaman Syarikat) |
+| 5 | Rekod EXPLAIN ANALYZE `/hourly` | Siap (19 Nov): 5.96 ms (lama) lawan 1.92 ms (baharu). Ulang pada data 30 hari |
 | 5 | Eksport PDF | Belum |
 | 5 | Tangkapan skrin dan dokumentasi akhir | Belum |
 
@@ -51,6 +54,7 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 - **`hourly_stats` menyimpan jumlah, bukan purata**: `snapshots`, `aircraft_sum` dan `peak_aircraft` bagi setiap (jam, lapangan terbang). Purata = jumlah ÷ snapshot, sama seperti `/hourly`, jadi snapshot tanpa pesawat dikira 0. Baris `airport = '*'` bermaksud semua pesawat.
 - **Ringkas dahulu, baru padam**: `/api/maintenance` meringkaskan 48 jam terakhir (idempotent, selamat dijalankan berulang kali), meringkaskan jam yang akan dipadam, kemudian memadam `observations` lebih 30 hari. Jadual `snapshots` tidak dipadam (kecil, 288 baris sehari, diperlukan carta jurang data).
 - **Hanya jam penuh diringkaskan**, supaya jam yang sedang berjalan tidak disimpan separuh jalan.
+- **Maintenance pulih selepas gangguan panjang** (`88b04ba`, 19 Nov): jika `max(hour)` dalam `hourly_stats` (baris `airport = '*'`) lebih lama daripada 48 jam, ringkasan bermula dari jam itu, dihadkan kepada tempoh retensi 30 hari. Tanpa gangguan, tetingkap kekal 48 jam. Sebelum ini, jam yang terlepas semasa gangguan jatuh di luar tetingkap 48 jam, dan query hibrid `/hourly` menganggap jam di tengah julat sudah diringkaskan, jadi jam itu dipaparkan sebagai 0 pesawat (angka palsu).
 - **`/hourly` hibrid**: jam penuh yang sudah diringkaskan dibaca daripada `hourly_stats`. `observations` hanya diimbas di dua hujung julat yang belum diringkaskan (jam separa di permulaan, dan jam terkini selepas ringkasan terakhir). Cron harian membuat ringkasan ketinggalan sehingga sehari, jadi bacaan hibrid perlu. Penapis `NOT EXISTS` sahaja tidak mempercepat query kerana Postgres tetap mengimbas semua `observations` dalam julat, maka imbasan dihadkan kepada dua julat itu.
 - **Eksport CSV**: format RFC 4180 (koma, hujung baris CRLF). Nilai bermula `=`, `+`, `-`, `@`, tab atau CR diawali `'` untuk mengelak formula injection. `type` tidak sah memberi 400. Query `/hourly` dan `/airlines` dikongsi dengan eksport (`hourlyData`, `airlinesData`), jadi respons JSON tidak berubah. CSV hanya teks, jadi tidak boleh membawa warna atau format.
 - **Eksport Excel (.xlsx) untuk rupa profesional**: dijana dengan `exceljs` di server (`server/src/lib/xlsx.js`), dengan tema navy dan biru langit yang sama seperti dashboard. `type=hourly` menghasilkan dua helaian: **Ringkasan** (empat kad KPI: purata pesawat, puncak, jam tersibuk, liputan data, dan profil 24 jam dengan bar data) dan **Data** (header dibekukan, penapis automatik, bar data pada purata, penyorotan oren bila liputan di bawah 75%). `type=airlines` menghasilkan satu helaian **Ranking**. Sel berangka ialah nombor sebenar, tarikh ialah tarikh sebenar (waktu Malaysia), dan nama syarikat yang bermula `=` kekal sebagai teks. Susun atur cetak A4 ditetapkan. Parameter dan had sama seperti `export.csv`. CSV dikekalkan untuk pengguna yang mahu data mentah.
@@ -63,10 +67,11 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 - `/api/maintenance`: HTTP 200 di tempatan (`summarizedRows` 257) dan di Render (`summarizedRows` 486, `deletedObservations` 0, cutoff 13 Okt). Tiada apa dipadam kerana data baru dua hari.
 - **Anggaran storan**: spot-check 24 jam ialah 13,259 baris `observations`, jadi kira-kira 13,300 sehari dan kira-kira 0.4 juta baris selepas 30 hari. Anggaran lama dalam PROPOSAL.md (22,000 sehari) terlalu tinggi dan perlu dibetulkan. Sahkan dengan `pg_size_pretty` selepas seminggu.
 - **EXPLAIN ANALYZE `/hourly`** (`explain-hourly.sql`):
-  - Data sekitar 3 hari di Neon: query lama **4.11 ms** (Execution Time dalam tab Plan, larian pertama). Nombor query baharu **belum direkodkan**.
+  - Data sekitar 3 hari di Neon: query lama **4.11 ms** (Execution Time dalam tab Plan, larian pertama).
+  - 19 Nov 2026, KUL, 7 hari (kira-kira 4.6 hari berdata), `EXPLAIN (ANALYZE, BUFFERS)` di Neon, nilai terendah daripada larian berulang: query lama **5.96 ms** (6.05, 5.96, 6.68), query baharu **1.92 ms** (1.92, 2.15; bacaan larian pertama tidak dicatat). Planning 0.30 ms lawan 0.72 ms.
   - Data sintetik 30 hari di komputer tempatan (kira-kira 408,000 baris `observations`, KUL): 7 hari 17 ms ke 3 ms, 30 hari 55 ms ke 5 ms, hasil sama pada 32 kombinasi julat dan lapangan terbang.
-  - Dalam laporan, tulis bahawa pada data beberapa hari kedua-dua query di bawah 5 ms, dan ukuran diulang apabila data mencapai 30 hari (sekitar 10 Disember). Jangan tulis "3× lebih laju". Faedah sebenar: selepas hari ke-30 hanya query baharu mempunyai sejarah jam demi jam.
-- **Ujian**: server 25 lulus dan 37 dilangkau (di komputer tanpa Postgres). Yang dilangkau (25 dalam `api.test.js`, 6 dalam `export.test.js`, 6 dalam `export-xlsx.test.js`) memerlukan `TEST_DATABASE_URL` dan dijalankan oleh CI. Client 11 lulus (5 `airlineColors`, selebihnya `csvUrl`). Di CI (Postgres 16) job `server` dan `client` kedua-duanya hijau (`a4e6456`).
+  - Dalam laporan, tulis bahawa pada data sekitar 7 hari (kira-kira 4.6 hari berdata) query lama ialah kira-kira 6 ms dan query baharu kira-kira 1.9 ms, dan ukuran diulang apabila data mencapai 30 hari (sekitar 10 Disember). Jangan tulis "3× lebih laju". Faedah sebenar: selepas hari ke-30 hanya query baharu mempunyai sejarah jam demi jam.
+- **Ujian**: server 25 lulus dan 37 dilangkau (di komputer tanpa Postgres). Yang dilangkau (25 dalam `api.test.js`, 6 dalam `export.test.js`, 6 dalam `export-xlsx.test.js`) memerlukan `TEST_DATABASE_URL` dan dijalankan oleh CI. Client 11 lulus (5 `airlineColors`, selebihnya `csvUrl`). Di CI (Postgres 16) job `server` dan `client` kedua-duanya hijau (`ff4acc0`).
 
 ## Isu diketahui dan hutang teknikal
 
@@ -76,8 +81,9 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 - Garis "Paras biasa" belum muncul sehingga data melebihi sehari (jangkaan).
 - Bundle JS utama 628 kB (amaran Vite). Peta (Leaflet) sudah dipecahkan ke chunk berasingan.
 - **Selepas 30 hari**, `/hourly` masih memberi sejarah lama (daripada `hourly_stats`), tetapi `/airports/compare`, `/airports/:code/weekly`, `/airlines`, `/airlines/timeseries` dan `/density` membaca `observations` dan hanya merangkumi 30 hari terakhir. Corak mingguan dan syarikat tidak diringkaskan.
-- IndiGo muncul dalam ranking tetapi tiada warna tetap dalam `airlineColors.ts` (guna warna sandaran). "Tidak dikenal pasti" berada di tempat ke-4, jadi semak sama ada awalan callsign yang kerap muncul belum ada dalam `airlines.js`.
+- IndiGo kini ada warna tetap (`ff4acc0`, 19 Nov). "Tidak dikenal pasti" ialah pemerhatian tanpa syarikat komersial. Semakan 19 Nov (Neon, 7 hari): 4,405 pemerhatian tanpa syarikat, 2,180 (49.5%) tanpa callsign dan 2,225 (50.5%) menggunakan nombor pendaftaran pesawat (9M-, N, T7-, VP-, VH-, HS-) sebagai callsign, iaitu penerbangan am dan jet korporat. Bukan syarikat penerbangan komersial yang tiada dalam pemetaan, jadi `airlines.js` tidak perlu diubah. Pemetaan baharu hanya terpakai pada data masa depan kerana airline disimpan semasa pengumpulan.
 - Jadual cron `airspace-maintenance`: semak "Next execution" ialah 04:00 pagi (zon Asia/Kuala_Lumpur), bukan 16:00. Sahkan larian terakhir kedua-dua job cron ialah 200 dan `COLLECTOR_SECRET` sama pada kedua-duanya. Jadual ini sempat berjalan setiap 5 minit pada 18 hingga 19 Nov, dan dibetulkan kepada sekali sehari 04:00 pada 19 Nov ("Next execution" disahkan Tomorrow at 4:00 AM). Pemerhatian 16 Nov: `max(hour)` dalam `hourly_stats` ialah 2026-11-15 19:00 UTC (03:00 MYT), konsisten dengan cron 04:00 yang berjalan, tetapi HISTORY di cron-job.org belum disemak.
+- **Jam `hourly_stats` terlepas selepas gangguan (dibetulkan 19 Nov).** `hourly_stats` berhenti pada 16 Nov 03:00 MYT, jadi jam 04:00 hingga 11:00 tidak pernah diringkaskan dan `/hourly` menunjukkan KUL 0 pesawat (angka palsu, bukan trafik sebenar). Punca (yakin separa): maintenance hanya meringkaskan 48 jam terakhir. Data dibetulkan dengan upsert SQL sekali jalan di Neon (16 Nov 04:00 hingga 12:00 MYT): sembilan baris KUL, `aircraft_sum` untuk 04:00 hingga 11:00 sepadan dengan `observations` (34, 56, 86, 103, 69, 103, 77, 12). Jam 11:00 hanya 2 snapshot, jadi ditandakan tidak lengkap. Pembetulan kekal dalam `88b04ba`. Dashboard disahkan 19 Nov: lapan jam sifar pada 16 Nov sudah hilang dan jurang 16 Nov 12:00 hingga 18 Nov 14:00 kekal.
 - Pemantauan Neon: semak jam pengiraan percuma, dan saiz pangkalan data selepas seminggu:
   ```sql
   SELECT pg_size_pretty(pg_database_size(current_database()));
@@ -96,12 +102,12 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 
 1. ~~Betulkan CI~~ **Siap** (18 Nov, `a4e6456`, job `server` dan `client` hijau).
 2. ~~Butang "Muat turun Excel"~~ Siap (`d98842c`).
-3. Sahkan cron harian: selepas 04:00, `SELECT max(hour) FROM hourly_stats WHERE airport = '*';` patut dalam sejam terakhir, dan `deletedObservations` kekal 0 sehingga data melebihi 30 hari.
-4. Rekod Execution Time query baharu daripada Neon (tab Plan) untuk `explain-hourly.sql`.
+3. Sahkan cron harian (larian 04:00 pada 20 Nov, jangkaan `max(hour)` = 2026-11-19 19:00 UTC, iaitu 20 Nov 03:00 MYT): selepas 04:00, `SELECT max(hour) FROM hourly_stats WHERE airport = '*';` patut dalam sejam terakhir, dan `deletedObservations` kekal 0 sehingga data melebihi 30 hari.
+4. ~~Rekod Execution Time query baharu daripada Neon untuk `explain-hourly.sql`~~ **Siap** (19 Nov): 5.96 ms lawan 1.92 ms.
 5. Eksport PDF (`/api/stats/export.pdf`, `pdfkit`): tajuk, julat tarikh, jadual 10 teratas dan nota "diperhatikan oleh feed ADS-B".
-6. Kemas kini PROPOSAL.md (status fasa, anggaran storan 13,300 baris sehari, kriteria kejayaan yang sudah diukur), tangkapan skrin dan kajian kes dalam README.
+6. ~~Kemas kini PROPOSAL.md~~ **Siap** (`8bd6c24`, dikemas kini lagi 19 Nov). **Belum:** tangkapan skrin dan kajian kes dalam README (sertakan teks "Tidak dikenal pasti" daripada bahagian Isu diketahui).
 7. Ukur semula EXPLAIN apabila data mencapai 30 hari, dan ukur kriteria kejayaan lain (lihat PROPOSAL.md).
-8. Tambah ujian dashboard lain (cth. pemetaan warna peta), warna IndiGo, dan semak awalan "Tidak dikenal pasti".
+8. Tambah ujian dashboard lain (cth. pemetaan warna peta). ~~Warna IndiGo dan semak awalan "Tidak dikenal pasti"~~ **Siap** (19 Nov).
 
 ## Cara sambung semula
 
@@ -162,3 +168,4 @@ Jangan jalankan ini jika `DATABASE_URL` tempatan menunjuk ke Neon production, me
 - **15 Nov 2026**: eksport Excel bertema (`/api/stats/export.xlsx`, `ee41b31`) dengan `exceljs`, ujian unit dan ujian laluan baharu. Kerja disambung pada komputer lain (klon baharu), dan masalah pemasangan rolldown di Windows dicatat di atas.
 - **16 Nov 2026**: butang "Muat turun Excel" (di sebelah butang CSV) pada halaman Lapangan terbang dan Syarikat di-push (`d98842c`), dan README serta PROGRESS dikemas kini (`b9dd70d`). Eksport Excel disahkan di Render: muat turun dua kali berturut-turut berfungsi, jadi cache tidak merosakkan respons binari. Ayat "Paling sibuk" menunjukkan `data ≈ 5.6 hari`. Commit `d98842c` bertanda X merah di GitHub: job CI yang gagal belum dikenal pasti.
 - **16 hingga 18 Nov 2026**: collector terhenti dari sekitar 16 Nov 11:05 pagi kerana jadual `airspace-collect` di cron-job.org tersetkan sekali sehari, dibetulkan kepada setiap 5 minit pada 18 Nov (larian berjaya 4:15 petang). Kira-kira 52 jam data hilang. CI server merah pada `d98842c` kerana binari rolldown Linux tiada dalam lockfile yang dijana di Windows, dibetulkan dalam `ci.yml` (`a4e6456`), dan kedua-dua job hijau.
+- **19 Nov 2026**: jadual `airspace-maintenance` dibetulkan kepada sekali sehari 04:00 (sempat berjalan setiap 5 minit pada 18 hingga 19 Nov, tidak merosakkan data kerana idempotent tetapi membazir jam pengiraan Neon). Didapati `hourly_stats` terlepas jam 04:00 hingga 11:00 pada 16 Nov (`/hourly` menunjukkan KUL 0 palsu): data dibetulkan dengan upsert sekali jalan, dan maintenance dibetulkan kekal supaya meringkaskan dari jam terakhir jika gangguan melebihi 48 jam (`88b04ba`). Warna tetap IndiGo (`ff4acc0`). CI hijau untuk kedua-dua commit (#24, #25). Kesimpulan "Tidak dikenal pasti": pendaftaran pesawat dan tanpa callsign, bukan syarikat komersial yang tiada dalam pemetaan. EXPLAIN `/hourly` direkodkan (5.96 ms lawan 1.92 ms). Dashboard disahkan (KUL, Syarikat, Ringkasan).

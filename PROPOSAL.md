@@ -1,6 +1,6 @@
 # Cadangan Projek: Malaysian Airspace Analytics
 
-> Dikemas kini pada 18 November 2026 berdasarkan `GUIDE.md` dan keadaan sebenar projek. Jika ada proposal asal, selaraskan bahagian yang berbeza.
+> Dikemas kini pada 19 November 2026 berdasarkan `GUIDE.md` dan keadaan sebenar projek. Jika ada proposal asal, selaraskan bahagian yang berbeza.
 
 ## Latar belakang
 
@@ -58,9 +58,9 @@ Collector didahulukan kerana data tidak boleh diambil semula.
 
 1. Soalan "bila KUL paling sibuk pada hari bekerja?" dijawab dalam kurang 1 minit menggunakan dashboard.
 2. Kadar kejayaan collector tinggi dan boleh diukur melalui `/api/stats/collector`. Diukur: 267 daripada 288 snapshot dijangka dalam satu tempoh 24 jam (92.7%). Collector terhenti kira-kira 52 jam pada 16 hingga 18 Nov kerana jadual cron tersilap, jadi ukur semula dengan julat lebih panjang.
-3. Masa query pada data penuh diukur dengan `EXPLAIN ANALYZE`, dan dilaporkan sebelum dan selepas jadual ringkasan. Separa: query lama 4.11 ms pada data sekitar 3 hari, query baharu belum direkodkan, dan ukuran diulang apabila data mencapai 30 hari.
+3. Masa query pada data penuh diukur dengan `EXPLAIN ANALYZE`, dan dilaporkan sebelum dan selepas jadual ringkasan. Diukur pada data pendek (19 Nov, KUL, 7 hari dengan kira-kira 4.6 hari berdata, `EXPLAIN (ANALYZE, BUFFERS)` di Neon): query lama 5.96 ms, query baharu 1.92 ms. Kedua-duanya ringan pada data beberapa hari, jadi ukuran diulang apabila data mencapai 30 hari (sekitar 10 Disember). Data sintetik 30 hari (tempatan): 55 ms ke 5 ms.
 4. Jadual ringkasan sepadan dengan query mentah (spot-check untuk satu hari). Dipenuhi: spot-check 24 jam (267 snapshot, 13,259 jumlah pesawat) memberi 0 percanggahan untuk semua pesawat dan KUL.
-5. URL awam berfungsi dan CI hijau. Dipenuhi pada 18 Nov (`a4e6456`).
+5. URL awam berfungsi dan CI hijau. Dipenuhi (CI hijau pada 18 Nov `a4e6456`, disahkan lagi pada 19 Nov `ff4acc0`).
 
 ## Risiko dan mitigasi
 
@@ -73,7 +73,10 @@ Collector didahulukan kerana data tidak boleh diambil semula.
 | `nearest_apt` disalah tafsir sebagai berlepas atau mendarat | Nota pada caption carta, definisi "dalam 60 km" |
 | Pelan percuma Render tidur | Cron 5 minit menjaga API terjaga, dashboard berupa laman statik |
 | Data hilang bila collector berhenti | Notifikasi emel kegagalan cron-job, jurang ditandakan pada carta. Berlaku sekali (16 hingga 18 Nov, kira-kira 52 jam) kerana jadual cron tersilap, dan jurang itu tidak boleh diambil semula |
+| `hourly_stats` tertinggal selepas gangguan panjang (jam tidak diringkaskan, `/hourly` menunjukkan 0 palsu) | Berlaku 16 Nov. Maintenance kini meringkaskan dari jam terakhir dalam `hourly_stats` (dihadkan kepada retensi 30 hari), `88b04ba`. Jam yang terlepas dibetulkan dengan upsert sekali jalan |
 
 ## Penafian data
 
 Angka mewakili pesawat yang diperhatikan oleh feed ADS-B awam. Liputan bergantung pada penerima sukarelawan dan bukan bilangan rasmi penerbangan.
+
+**Kategori "Tidak dikenal pasti"**: kira-kira separuh pemerhatian tiada callsign, dan separuh lagi menggunakan nombor pendaftaran pesawat (9M-, N, T7-, VP-, VH-, HS-) sebagai callsign, iaitu penerbangan am dan jet korporat. Bukan syarikat penerbangan komersial yang tiada dalam pemetaan (semakan 19 Nov, 7 hari).

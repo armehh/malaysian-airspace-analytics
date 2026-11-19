@@ -20,6 +20,7 @@ export const AIRLINE_COLORS: Record<string, string> = {
   'Garuda Indonesia': '#51cf66',
   'Turkish Airlines': '#e03131',
   'Lufthansa': '#fcc419',
+  'IndiGo': '#748ffc',
   'Lain-lain': '#5b7388',
   'Tidak dikenal pasti': '#3d5367',
 };

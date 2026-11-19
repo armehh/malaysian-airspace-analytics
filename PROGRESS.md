@@ -1,6 +1,6 @@
 # Progress Projek
 
-Dikemas kini: **18 November 2026**
+Dikemas kini: **19 November 2026**
 Rujukan pantas untuk menyambung kerja pada bila-bila masa.
 
 ## Ringkasan
@@ -77,7 +77,7 @@ Setiap `git push` ke `main` mencetus deploy semula perkhidmatan berkaitan (API h
 - Bundle JS utama 628 kB (amaran Vite). Peta (Leaflet) sudah dipecahkan ke chunk berasingan.
 - **Selepas 30 hari**, `/hourly` masih memberi sejarah lama (daripada `hourly_stats`), tetapi `/airports/compare`, `/airports/:code/weekly`, `/airlines`, `/airlines/timeseries` dan `/density` membaca `observations` dan hanya merangkumi 30 hari terakhir. Corak mingguan dan syarikat tidak diringkaskan.
 - IndiGo muncul dalam ranking tetapi tiada warna tetap dalam `airlineColors.ts` (guna warna sandaran). "Tidak dikenal pasti" berada di tempat ke-4, jadi semak sama ada awalan callsign yang kerap muncul belum ada dalam `airlines.js`.
-- Jadual cron `airspace-maintenance`: semak "Next execution" ialah 04:00 pagi (zon Asia/Kuala_Lumpur), bukan 16:00. Sahkan larian terakhir kedua-dua job cron ialah 200 dan `COLLECTOR_SECRET` sama pada kedua-duanya. Pada 18 Nov jadual `airspace-maintenance` kelihatan berjalan setiap 5 minit: semak dan betulkan kepada sekali sehari 04:00. Pemerhatian 16 Nov: `max(hour)` dalam `hourly_stats` ialah 2026-11-15 19:00 UTC (03:00 MYT), konsisten dengan cron 04:00 yang berjalan, tetapi HISTORY di cron-job.org belum disemak.
+- Jadual cron `airspace-maintenance`: semak "Next execution" ialah 04:00 pagi (zon Asia/Kuala_Lumpur), bukan 16:00. Sahkan larian terakhir kedua-dua job cron ialah 200 dan `COLLECTOR_SECRET` sama pada kedua-duanya. Jadual ini sempat berjalan setiap 5 minit pada 18 hingga 19 Nov, dan dibetulkan kepada sekali sehari 04:00 pada 19 Nov ("Next execution" disahkan Tomorrow at 4:00 AM). Pemerhatian 16 Nov: `max(hour)` dalam `hourly_stats` ialah 2026-11-15 19:00 UTC (03:00 MYT), konsisten dengan cron 04:00 yang berjalan, tetapi HISTORY di cron-job.org belum disemak.
 - Pemantauan Neon: semak jam pengiraan percuma, dan saiz pangkalan data selepas seminggu:
   ```sql
   SELECT pg_size_pretty(pg_database_size(current_database()));

@@ -29,7 +29,14 @@ export async function runMaintenance(pool, { retentionDays = 30, now = new Date(
   const hourNow = new Date(Math.floor(now.getTime() / HOUR) * HOUR); // jam penuh sahaja
   const cutoff = new Date(hourNow.getTime() - retentionDays * DAY);
 
-  let summarized = await summarizeRange(pool, new Date(hourNow.getTime() - 48 * HOUR), hourNow);
+  // Jika jam terakhir yang diringkaskan lebih lama daripada 48 jam, mula dari situ (dihadkan kepada tempoh retensi),
+  // supaya gangguan panjang tidak meninggalkan jam yang tidak diringkaskan.
+  const { rows: lastRows } = await pool.query("SELECT max(hour) AS last FROM hourly_stats WHERE airport = '*'");
+  const floor48 = new Date(hourNow.getTime() - 48 * HOUR);
+  let from = floor48;
+  const last = lastRows[0] && lastRows[0].last;
+  if (last && last < floor48) from = new Date(Math.max(last.getTime(), cutoff.getTime()));
+  let summarized = await summarizeRange(pool, from, hourNow);
 
   let deleted = 0;
   const { rows } = await pool.query('SELECT min(taken_at) AS oldest FROM observations');

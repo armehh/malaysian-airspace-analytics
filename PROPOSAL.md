@@ -1,6 +1,6 @@
 # Cadangan Projek: Malaysian Airspace Analytics
 
-> Draf yang dikemas kini berdasarkan `GUIDE.md` dan keadaan sebenar projek pada 10 November 2026. Jika ada proposal asal, selaraskan bahagian yang berbeza.
+> Dikemas kini pada 18 November 2026 berdasarkan `GUIDE.md` dan keadaan sebenar projek. Jika ada proposal asal, selaraskan bahagian yang berbeza.
 
 ## Latar belakang
 
@@ -18,9 +18,9 @@ Data pergerakan pesawat dari penerima ADS-B awam tersedia secara langsung, tetap
 **Dalam skop**
 - Collector berbilang feed dengan fallback
 - Skema Postgres, REST API, ujian
-- Dashboard: Ringkasan, Lapangan terbang, Syarikat, peta heatmap
+- Dashboard: Ringkasan, Lapangan terbang, Syarikat, peta kepadatan (petak grid, bukan heatmap)
 - Jadual ringkasan dan retensi data 30 hari
-- Eksport CSV dan PDF
+- Eksport CSV dan Excel (PDF pilihan)
 - Deploy awam dan dokumentasi
 
 **Di luar skop**
@@ -48,19 +48,19 @@ Seni bina: penjadual memanggil API, API mengambil snapshot dan menyimpannya, das
 |---|---|---|---|
 | 1 | Skema, collector | Minggu 1 | Siap |
 | 2 | API dan ujian | Minggu 1 | Siap |
-| 3 | Dashboard (Ringkasan, Lapangan terbang, Syarikat) | Minggu 2 | Separa (Syarikat belum) |
-| 4 | Heatmap, `hourly_stats`, retensi | Minggu 3 | Belum |
-| 5 | Eksport, CI penuh, dokumentasi | Minggu 4 | Belum |
+| 3 | Dashboard (Ringkasan, Lapangan terbang, Syarikat) | Minggu 2 | Siap |
+| 4 | Peta kepadatan, `hourly_stats`, retensi | Minggu 3 | Siap |
+| 5 | Eksport, CI penuh, dokumentasi | Minggu 4 | Hampir siap (eksport CSV dan Excel serta CI siap; PDF, tangkapan skrin dan dokumentasi akhir tinggal) |
 
 Collector didahulukan kerana data tidak boleh diambil semula.
 
 ## Kriteria kejayaan
 
 1. Soalan "bila KUL paling sibuk pada hari bekerja?" dijawab dalam kurang 1 minit menggunakan dashboard.
-2. Kadar kejayaan collector tinggi dan boleh diukur melalui `/api/stats/collector`.
-3. Masa query pada data penuh diukur dengan `EXPLAIN ANALYZE`, dan dilaporkan sebelum dan selepas jadual ringkasan.
-4. Jadual ringkasan sepadan dengan query mentah (spot-check untuk satu hari).
-5. URL awam berfungsi dan CI hijau.
+2. Kadar kejayaan collector tinggi dan boleh diukur melalui `/api/stats/collector`. Diukur: 267 daripada 288 snapshot dijangka dalam satu tempoh 24 jam (92.7%). Collector terhenti kira-kira 52 jam pada 16 hingga 18 Nov kerana jadual cron tersilap, jadi ukur semula dengan julat lebih panjang.
+3. Masa query pada data penuh diukur dengan `EXPLAIN ANALYZE`, dan dilaporkan sebelum dan selepas jadual ringkasan. Separa: query lama 4.11 ms pada data sekitar 3 hari, query baharu belum direkodkan, dan ukuran diulang apabila data mencapai 30 hari.
+4. Jadual ringkasan sepadan dengan query mentah (spot-check untuk satu hari). Dipenuhi: spot-check 24 jam (267 snapshot, 13,259 jumlah pesawat) memberi 0 percanggahan untuk semua pesawat dan KUL.
+5. URL awam berfungsi dan CI hijau. Dipenuhi pada 18 Nov (`a4e6456`).
 
 ## Risiko dan mitigasi
 
@@ -69,10 +69,10 @@ Collector didahulukan kerana data tidak boleh diambil semula.
 | Terma penggunaan penyedia feed menghalang kegunaan | Semak terma setiap penyedia, sediakan feed alternatif dalam `feeds.js` |
 | Feed utama gagal atau berubah format | Fallback automatik ke feed lain dan OpenSky, kegagalan dilog dalam `collector_runs` |
 | Had pengiraan percuma Neon habis kerana cron kerap | Pantau selepas 2 hingga 3 hari, tukar ke setiap 10 minit atau guna Supabase |
-| Storan membesar (anggaran sekitar 22,000 baris sehari) | Retensi 30 hari selepas diringkaskan, semak saiz selepas seminggu |
+| Storan membesar (diukur sekitar 13,300 baris sehari, kira-kira 0.4 juta baris selepas 30 hari) | Retensi 30 hari selepas diringkaskan, semak saiz selepas seminggu |
 | `nearest_apt` disalah tafsir sebagai berlepas atau mendarat | Nota pada caption carta, definisi "dalam 60 km" |
 | Pelan percuma Render tidur | Cron 5 minit menjaga API terjaga, dashboard berupa laman statik |
-| Data hilang bila collector berhenti | Notifikasi emel kegagalan cron-job, jurang ditandakan pada carta |
+| Data hilang bila collector berhenti | Notifikasi emel kegagalan cron-job, jurang ditandakan pada carta. Berlaku sekali (16 hingga 18 Nov, kira-kira 52 jam) kerana jadual cron tersilap, dan jurang itu tidak boleh diambil semula |
 
 ## Penafian data
 

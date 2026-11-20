@@ -82,6 +82,8 @@ Server tempatan memerlukan `server/.env` (salin `.env.example`; `CORS_ORIGIN=htt
 - Guna `curl.exe`, bukan `curl` (alias PowerShell berbeza).
 - Jika `npm` disekat, jalankan sekali: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 - Dalam `.env`, letak `DATABASE_URL` sebagai **satu baris sahaja**. Jangan biarkan baris contoh lama kekal.
+- Dalam folder `client`, cipta `.env.local` dengan `Set-Content .env.local "VITE_API_URL=http://localhost:3000" -Encoding ascii`. Dalam PowerShell 5.1, `echo ... > .env.local` menulis UTF-16, yang tidak dibaca dengan betul oleh Vite.
+- Guna `git clone`, bukan muat turun ZIP (ZIP tiada `.git`, jadi tidak boleh commit atau push). `server/.env` dan `client/.env.local` tidak ada dalam git, jadi cipta semula pada setiap komputer. Jalankan `git pull` sebelum bekerja.
 
 ## Pemboleh ubah persekitaran
 
@@ -161,7 +163,7 @@ Pada data beberapa hari kedua-dua query ringan. Faedah sebenar jadual ringkasan 
 
 ### Dua kejadian sebenar
 
-1. **Collector terhenti kira-kira 52 jam (16 hingga 18 Nov).** Jadual `airspace-collect` di cron-job.org tersilap ditetapkan sekali sehari. Data ADS-B awam tidak boleh diambil semula, jadi jurang itu kekal dan ditandakan pada carta, bukan diisi dengan 0. Pelajaran: selepas mengubah jadual cron, sahkan "Next execution" dan larian berjaya yang pertama.
+1. **Collector terhenti kira-kira 52 jam (16 hingga 18 Nov).** Jadual `airspace-collect` di cron-job.org tersilap ditetapkan sekali sehari. Data ADS-B awam tidak boleh diambil semula, jadi jurang itu kekal sebagai jurang dalam data, bukan diisi dengan 0. Pelajaran: selepas mengubah jadual cron, sahkan "Next execution" dan larian berjaya yang pertama.
 2. **Jam sifar palsu pada `/hourly`.** `hourly_stats` berhenti pada 16 Nov 03:00 MYT, jadi jam 04:00 hingga 11:00 tidak pernah diringkaskan dan carta KUL menunjukkan 0 pesawat, angka palsu dan bukan trafik sebenar. Punca (yakin separa): maintenance hanya meringkaskan 48 jam terakhir, jadi jam yang terlepas semasa gangguan jatuh di luar tetingkap itu, dan query hibrid menganggap jam di tengah julat sudah diringkaskan. Data dibetulkan dengan upsert sekali jalan dan disahkan terhadap `observations`, kemudian maintenance dibetulkan supaya bermula dari jam terakhir yang diringkaskan. Pembetulan kekal diuji dengan pool tiruan dan CI. Larian harian sebenar pertama selepas pembetulan (20 Nov 04:00 MYT) berjaya dan `max(hour)` sepadan dengan jangkaan. Laluan pemulihan gangguan lebih 48 jam sendiri hanya diuji dengan pool tiruan, kerana belum ada gangguan baharu. Pelajaran: ringkasan yang idempotent mesti boleh pulih daripada gangguan yang lebih panjang daripada tetingkapnya, dan sentiasa sahkan ringkasan terhadap data mentah.
 
 ## Had yang diketahui
@@ -180,6 +182,8 @@ cd server
 npm test                    # ujian unit sahaja jika tiada pangkalan data ujian
 TEST_DATABASE_URL=postgres://user:pass@localhost/airspace_test npm test   # termasuk ujian API
 ```
+
+**Amaran:** ujian API menjalankan `DROP SCHEMA public CASCADE` pada pangkalan data yang ditetapkan oleh `TEST_DATABASE_URL`. Jangan sekali-kali guna pangkalan data production (Neon). Guna pangkalan data tempatan atau branch ujian berasingan.
 
 Dashboard:
 ```bash

@@ -72,7 +72,7 @@ Collector didahulukan kerana data tidak boleh diambil semula.
 | Storan membesar (diukur sekitar 13,300 baris sehari, kira-kira 0.4 juta baris selepas 30 hari) | Retensi 30 hari selepas diringkaskan, semak saiz selepas seminggu |
 | `nearest_apt` disalah tafsir sebagai berlepas atau mendarat | Nota pada caption carta, definisi "dalam 60 km" |
 | Pelan percuma Render tidur | Cron 5 minit menjaga API terjaga, dashboard berupa laman statik |
-| Data hilang bila collector berhenti | Notifikasi emel kegagalan cron-job, jurang ditandakan pada carta. Berlaku sekali (16 hingga 18 Nov, kira-kira 52 jam) kerana jadual cron tersilap, dan jurang itu tidak boleh diambil semula |
+| Data hilang bila collector berhenti | Notifikasi emel kegagalan cron-job, jurang kekal sebagai jurang dalam data (bukan diisi 0). Berlaku sekali (16 hingga 18 Nov, kira-kira 52 jam) kerana jadual cron tersilap, dan jurang itu tidak boleh diambil semula |
 | `hourly_stats` tertinggal selepas gangguan panjang (jam tidak diringkaskan, `/hourly` menunjukkan 0 palsu) | Berlaku 16 Nov. Maintenance kini meringkaskan dari jam terakhir dalam `hourly_stats` (dihadkan kepada retensi 30 hari), `88b04ba`. Jam yang terlepas dibetulkan dengan upsert sekali jalan |
 
 ## Penafian data

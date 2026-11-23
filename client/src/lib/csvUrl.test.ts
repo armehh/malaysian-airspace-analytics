@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { csvUrl, exportUrl } from './csvUrl';
+import { csvUrl, exportUrl, EXPORT_OPTIONS } from './csvUrl';
 
 describe('csvUrl', () => {
   const base = 'https://api.example.com';
@@ -19,6 +19,16 @@ describe('csvUrl', () => {
   it('exportUrl xlsx guna laluan export.xlsx dengan parameter sama', () => {
     expect(exportUrl(base, { type: 'hourly', airport: 'KUL' }, 'xlsx')).toBe('https://api.example.com/api/stats/export.xlsx?type=hourly&airport=KUL');
     expect(exportUrl(base + '/', { type: 'airlines', top: 10 }, 'xlsx')).toBe('https://api.example.com/api/stats/export.xlsx?type=airlines&top=10');
+  });
+  it('exportUrl pdf guna laluan export.pdf dengan parameter sama', () => {
+    expect(exportUrl(base, { type: 'hourly', airport: 'KUL' }, 'pdf')).toBe('https://api.example.com/api/stats/export.pdf?type=hourly&airport=KUL');
+    expect(exportUrl(base + '/', { type: 'airlines', top: 10 }, 'pdf')).toBe('https://api.example.com/api/stats/export.pdf?type=airlines&top=10');
+  });
+  it('menu muat turun: Excel, CSV, PDF mengikut susunan, dan setiap pilihan ada URL sepadan', () => {
+    expect(EXPORT_OPTIONS.map((o) => o.label)).toEqual(['Excel', 'CSV', 'PDF']);
+    for (const o of EXPORT_OPTIONS) {
+      expect(exportUrl(base, { type: 'airlines' }, o.format)).toContain(`/api/stats/export${o.ext}?`);
+    }
   });
   it('exportUrl lalai ialah csv', () => {
     expect(exportUrl(base, { type: 'airlines' })).toBe(csvUrl(base, { type: 'airlines' }));

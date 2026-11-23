@@ -1,4 +1,6 @@
 // Ringkasan setiap jam + retensi. Idempotent: boleh dijalankan berulang kali.
+import { updateRecords } from './lib/records.js';
+
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
 
@@ -41,11 +43,16 @@ export async function runMaintenance(pool, { retentionDays = 30, now = new Date(
   let deleted = 0;
   const { rows } = await pool.query('SELECT min(taken_at) AS oldest FROM observations');
   const oldest = rows[0].oldest;
+
+  // Rekod kekal (pesawat tertinggi / terpantas): kemas kini sebelum pemadaman. Jadual kosong diisi daripada semua data yang ada.
+  const emptyRecords = (await pool.query('SELECT 1 FROM records LIMIT 1')).rowCount === 0;
+  let recordsTouched = await updateRecords(pool, emptyRecords && oldest ? oldest : from, hourNow);
   if (oldest && oldest < cutoff) {
+    if (!emptyRecords) recordsTouched += await updateRecords(pool, oldest, cutoff);
     // Ringkaskan dahulu semua jam yang akan dipadam, baru padam.
     const start = new Date(Math.floor(oldest.getTime() / HOUR) * HOUR);
     summarized += await summarizeRange(pool, start, cutoff);
     deleted = (await pool.query('DELETE FROM observations WHERE taken_at < $1', [cutoff.toISOString()])).rowCount;
   }
-  return { ok: true, summarizedRows: summarized, deletedObservations: deleted, cutoff: cutoff.toISOString() };
+  return { ok: true, summarizedRows: summarized, deletedObservations: deleted, recordsUpdated: recordsTouched, cutoff: cutoff.toISOString() };
 }

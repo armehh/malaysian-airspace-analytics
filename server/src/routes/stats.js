@@ -4,6 +4,7 @@ import { rangeSchema, airportParam, parse } from '../lib/validate.js';
 import { toCsv, num, exportTypeSchema, csvFilename } from '../lib/csv.js';
 import { buildWorkbook, XLSX_MIME, xlsxFilename } from '../lib/xlsx.js';
 import { buildPdf, PDF_MIME, pdfFilename } from '../lib/pdf.js';
+import { topRecords, RECORD_METRICS, RECORD_PERIODS } from '../lib/records.js';
 
 const TZ = 'Asia/Kuala_Lumpur';
 // Label masa tempatan Malaysia sebagai teks (elak masalah zon masa pemacu pg).
@@ -212,6 +213,17 @@ export function statsRouter(pool) {
     const file = await buildPdf({ type, q, data, airport });
     res.set({ 'Content-Type': PDF_MIME, 'Content-Disposition': `attachment; filename="${pdfFilename(csvFilename(type, q))}"` });
     res.send(file);
+  }));
+
+  // Top pesawat paling tinggi / paling laju. period=all (rekod kekal + data semasa), month (30 hari), week (7 hari).
+  r.get('/records', wrap(async (req, res) => {
+    const metric = String(req.query.metric ?? 'altitude');
+    const period = String(req.query.period ?? 'all');
+    const limit = req.query.limit === undefined ? 10 : Number(req.query.limit);
+    if (!RECORD_METRICS.includes(metric) || !RECORD_PERIODS.includes(period) || !Number.isInteger(limit) || limit < 1 || limit > 20) {
+      return res.status(400).json({ error: 'Parameter tidak sah: metric=altitude|speed, period=all|month|week, limit=1..20' });
+    }
+    res.json(await topRecords(pool, { metric, period, limit }));
   }));
 
   // Kesihatan collector: kadar kejayaan & jurang.

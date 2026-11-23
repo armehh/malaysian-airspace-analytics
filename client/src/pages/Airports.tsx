@@ -3,6 +3,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { useApi, type AirportList, type Compare, type Hourly, type Weekly } from '../lib/api';
 import '../airports.css';
 import ExportButtons from '../components/ExportButtons';
+import { fillHourGaps } from '../lib/hourGaps';
 
 const DAYS = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Isnin dahulu
@@ -27,6 +28,8 @@ export default function Airports() {
   const peakVal = Math.max(0, ...(weekly.data?.data ?? []).map((c) => c.avgAircraft));
   const peak = (weekly.data?.data ?? []).find((c) => c.avgAircraft === peakVal && peakVal > 0);
   const days = (weekly.data?.data ?? []).reduce((a, c) => a + c.snapshots, 0) / 288; // 288 snapshot sehari
+  const chartData = fillHourGaps(hourly.data?.data ?? []); // jam tanpa data menjadi titik kosong, supaya garis terputus
+  const hasGap = chartData.some((p) => p.avgAircraft === null);
 
   return (
     <div className="split">
@@ -54,7 +57,7 @@ export default function Airports() {
           {peak && days < 2 && <p className="note">Data baru ≈ {days.toFixed(1)} hari. Ayat "paling sibuk" muncul selepas 2 hari.</p>}
           <div className="chart">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={hourly.data?.data ?? []} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
                 <defs><linearGradient id="fillA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5cc8ff" stopOpacity={0.4} /><stop offset="100%" stopColor="#5cc8ff" stopOpacity={0} /></linearGradient></defs>
                 <CartesianGrid stroke="#1f3b53" vertical={false} />
                 <XAxis dataKey="hourMyt" tickFormatter={(v: string) => v.slice(5, 16).replace('T', ' ')} stroke="#8aa3b8" tickLine={false} minTickGap={72} />
@@ -64,7 +67,7 @@ export default function Airports() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="caption">Purata pesawat berdekatan setiap jam, masa Malaysia.</p>
+          <p className="caption">Purata pesawat berdekatan setiap jam, masa Malaysia.{hasGap && ' Ruang kosong ialah jam tanpa data (collector terhenti), bukan 0 pesawat.'}</p>
         </section>
 
         <section className="panel" style={{ marginTop: 16 }}>

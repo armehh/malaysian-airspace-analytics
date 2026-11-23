@@ -3,6 +3,7 @@ import { AIRPORTS } from '../lib/airports.js';
 import { rangeSchema, airportParam, parse } from '../lib/validate.js';
 import { toCsv, num, exportTypeSchema, csvFilename } from '../lib/csv.js';
 import { buildWorkbook, XLSX_MIME, xlsxFilename } from '../lib/xlsx.js';
+import { buildPdf, PDF_MIME, pdfFilename } from '../lib/pdf.js';
 
 const TZ = 'Asia/Kuala_Lumpur';
 // Label masa tempatan Malaysia sebagai teks (elak masalah zon masa pemacu pg).
@@ -199,6 +200,17 @@ export function statsRouter(pool) {
     const airport = q.airport ? (AIRPORTS.find((a) => a.code === q.airport) ?? { code: q.airport }) : null;
     const file = await buildWorkbook({ type, q, data, airport });
     res.set({ 'Content-Type': XLSX_MIME, 'Content-Disposition': `attachment; filename="${xlsxFilename(csvFilename(type, q))}"` });
+    res.send(file);
+  }));
+
+  // Muat turun PDF: laporan ringkas. type=hourly (boleh tapis airport) atau type=airlines. Julat sama seperti endpoint JSON.
+  r.get('/export.pdf', wrap(async (req, res) => {
+    const { type } = parse(exportTypeSchema, req.query);
+    const q = parse(rangeSchema, req.query);
+    const data = type === 'hourly' ? await hourlyData(q) : await airlinesData(q);
+    const airport = q.airport ? (AIRPORTS.find((a) => a.code === q.airport) ?? { code: q.airport }) : null;
+    const file = await buildPdf({ type, q, data, airport });
+    res.set({ 'Content-Type': PDF_MIME, 'Content-Disposition': `attachment; filename="${pdfFilename(csvFilename(type, q))}"` });
     res.send(file);
   }));
 

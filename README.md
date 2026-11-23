@@ -32,6 +32,16 @@ Penjadual luaran digunakan kerana pelan percuma Render tidur bila tiada perminta
 
 Lihat [PROGRESS.md](PROGRESS.md) untuk status terkini dan perkara yang akan datang.
 
+## Tangkapan skrin
+
+![Ringkasan: kad KPI dan carta 24 jam](docs/screenshots/ringkasan.png)
+
+![Lapangan terbang: carta mengikut jam (ruang kosong = jam tanpa data) dan menu Muat turun](docs/screenshots/lapangan-terbang-kul.png)
+
+![Syarikat penerbangan](docs/screenshots/syarikat.png)
+
+![Peta pesawat langsung](docs/screenshots/peta.png)
+
 ## Teknologi
 
 | Lapisan | Pilihan |

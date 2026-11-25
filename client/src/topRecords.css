@@ -1,0 +1,24 @@
+.toprec__bar { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0 6px; }
+.trseg { display: inline-flex; gap: 2px; background: var(--panel2); border: 1px solid var(--line); padding: 3px; border-radius: 999px; }
+.trseg button { all: unset; cursor: pointer; padding: 4px 14px; border-radius: 999px; font-size: .8125rem; color: var(--muted); }
+.trseg button[aria-pressed='true'] { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--sky); }
+.trseg button:focus-visible { outline: 2px solid var(--sky); }
+.toprec__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; transition: opacity .15s; }
+.toprec__list.is-stale { opacity: .5; }
+.toprec__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 96px; column-gap: 12px; row-gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; font-size: .875rem; }
+.toprec__row:hover { background: var(--panel2); }
+.toprec__rank { color: var(--muted); font-variant-numeric: tabular-nums; }
+.toprec__who { display: flex; flex-direction: column; min-width: 0; }
+.toprec__who b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toprec__who small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toprec__val { font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; }
+.toprec__val small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.toprec__when { color: var(--muted); font-size: .8125rem; text-align: right; font-variant-numeric: tabular-nums; }
+.toprec__track { grid-column: 2 / 5; height: 6px; border-radius: 3px; background: #1a3750; overflow: hidden; }
+.toprec__track i { display: block; height: 100%; background: var(--sky); border-radius: 3px; }
+@media (max-width: 520px) {
+  .toprec__row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .toprec__when { display: none; }
+  .toprec__track { grid-column: 2 / 4; }
+}
+@media (prefers-reduced-motion: reduce) { .toprec__list { transition: none; } }

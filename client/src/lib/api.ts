@@ -42,3 +42,7 @@ export function useApi<T>(path: string | null, refreshMs = 0) {
 }
 
 export type Density = { grid: number; snapshots: number; data: { lat: number; lng: number; count: number }[] };
+export type Records = {
+  metric: 'altitude' | 'speed'; period: 'all' | 'month' | 'week'; unit: string; limit: number;
+  data: { rank: number; icao24: string; callsign: string | null; airline: string | null; value: number; observedMyt: string }[];
+};

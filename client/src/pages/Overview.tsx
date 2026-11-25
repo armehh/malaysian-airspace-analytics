@@ -1,5 +1,6 @@
 import { Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApi, type Overview as Data } from '../lib/api';
+import TopRecords from '../components/TopRecords';
 
 const MIN_SNAPSHOTS = 6; // jangkaan 12 sejam; kurang daripada ini = jam tidak lengkap
 
@@ -59,6 +60,8 @@ export default function Overview() {
         {trend.length < 6 && <p className="note">Data masih sedikit ({trend.length} jam). Carta akan lebih bermakna selepas beberapa hari.</p>}
         <p className="caption">Purata pesawat yang diperhatikan feed ADS-B awam, bukan jumlah rasmi penerbangan. Titik berbulatan kosong ialah jam dengan data tidak lengkap (kurang {MIN_SNAPSHOTS} snapshot).</p>
       </section>
+
+      <TopRecords />
     </>
   );
 }
